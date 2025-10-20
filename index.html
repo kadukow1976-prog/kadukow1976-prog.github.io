@@ -104,7 +104,8 @@ const PASS_HASH_HEX = "ca4d4c3c5b0d70ba148f9774d92594c86954d2235545f73b6ae853608
 const $ = s => document.querySelector(s);
 const norm = s => (s||"").toLowerCase().replace(/[ёЁ]/g,"е").trim();
 const toHex = b => [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,"0")).join("");
-function parseCSV(t){const r=[],a=/,(?=(?:(?:[^"]*"){2})*[^"]*$)/;t.split(/?
+function parseCSV(t){const r=[],a=/,(?=(?:(?:[^"]*"){2})*[^"]*$)/;t.split(/
+?
 /).forEach(l=>{if(!l.trim())return;r.push(l.split(a).map(v=>v.replace(/^"|"$/g,"")))});return r;}
 function guessCell(v){const s=(v||"").trim();if(/^https?:/i.test(s))return `<a href="\${s}" target="_blank">\${s}</a>`;return s;}
 
