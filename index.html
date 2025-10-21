@@ -97,9 +97,11 @@ footer{color:var(--muted);text-align:center;margin:18px 0}
 
 <script>
 /* === НАСТРОЙКИ === */
-const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR9L9aeACtJASDu24QmYMDUpEkWAFB5977LMJ_FBPuoARlo7I8S_z3x4fzQxW8t7_DF6E3aplRwkS7/pub?gid=0&single=true&output=csv";
-const PASS_HASH_HEX = "ca4d4c3c5b0d70ba148f9774d92594c86954d2235545f73b6ae853608f5414f1";
-
+const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQr5tjcoANOKmeK8Mx4B2nHKrHdprWIcVrMBGd1Iqo4NW3-0xO9dHaTGR5HWxFa3DWWOAl6AkxVF7Lw/pub?gid=0&single=true&output=csv"; // <-- ВСТАВЬТЕ СВОЮ output=csv
+  const CACHE_KEY = "file_search_csv_v2";
+  const CACHE_TTL_MIN = 60;
+  const PAGE_SIZE = 20;
+  const PASS_HASH_HEX = "ca4d4c3c5b0d70ba148f9774d92594c86954d2235545f73b6ae853608f5414f1"; // <-- ВСТАВЬТЕ SHA-256(пароля) в hex
 /* === УТИЛИТЫ === */
 const $ = s => document.querySelector(s);
 const norm = s => (s||"").toLowerCase().replace(/[ёЁ]/g,"е").trim();
