@@ -43,7 +43,7 @@ import java.util.Set;
 public final class AppAuditActivity extends Activity {
     private static final int BG=0xff09101d, CARD=0xff142234, BORDER=0xff30475b;
     private static final int LIGHT=0xffeef7ff, MUTED=0xff9fb6c9, GREEN=0xff4ae6b1;
-    private static final String[] FILTERS={"Требуют проверки", "Наложение окон", "Автозапуск", "Игры", "Все пользовательские", "Выбранные", "Все включая системные"};
+    private static final String[] FILTERS={"Требуют проверки", "Наложение окон", "Автозапуск", "Планировщик/таймеры", "Игры", "Все пользовательские", "Выбранные", "Все включая системные"};
     private final ArrayList<AppItem> inventory=new ArrayList<>();
     private final Set<String> selected=new HashSet<>();
     private LinearLayout root, rows;
@@ -56,7 +56,7 @@ public final class AppAuditActivity extends Activity {
 
     private static class AppItem {
         String pkg, title, version;
-        boolean system, overlayDeclared, bootReceiver, foregroundService, game;
+        boolean system, overlayDeclared, bootReceiver, jobService, alarmDeclared, foregroundService, game;
         int recentScreenEvents, recentServiceEvents;
         long lastActivity;
         int flags(){
@@ -138,8 +138,8 @@ public final class AppAuditActivity extends Activity {
         });
         LinearLayout note=card("Что именно проверяется","Осторожно с системными и банковскими приложениями.");
         add(note,"• Наложение: приложение запросило SYSTEM_ALERT_WINDOW; реально включённый статус чужого приложения не гарантированно доступен.",11,MUTED,false,5);
-        add(note,"• Автозапуск: объявлен получатель BOOT_COMPLETED. Это не свидетельство выполнения сейчас.",11,MUTED,false,5);
-        add(note,"• Фон: зарегистрирован запуск foreground-службы по Usage Events. Планировщик JobScheduler, системные команды, скрипты и таймеры других приложений Android полностью не раскрывает.",11,MUTED,false,5);
+        add(note,"• Автозапуск: право RECEIVE_BOOT_COMPLETED или получатель загрузки. Это не доказывает реальный запуск.",11,MUTED,false,5);
+        add(note,"• Планировщик: объявлена служба JobScheduler или запрос точных таймеров. Расписание и код заданий скрыты. Фон: Usage Events при выдаче доступа.",11,MUTED,false,5);
         add(note,"• Сведения о рекламе — признаки для ручной проверки. Автоматически назвать приложение вредоносным по этим признакам нельзя.",11,MUTED,false,2);
         scan();
     }
@@ -169,6 +169,12 @@ public final class AppAuditActivity extends Activity {
                 int flags=PackageManager.GET_PERMISSIONS | PackageManager.GET_RECEIVERS | PackageManager.GET_SERVICES;
                 List<PackageInfo> packages=pm.getInstalledPackages(flags);
                 HashMap<String,int[]> events=new HashMap<>();
+                HashSet<String> bootReceivers=new HashSet<>();
+                try{
+                    for(android.content.pm.ResolveInfo receiver:pm.queryBroadcastReceivers(new Intent(Intent.ACTION_BOOT_COMPLETED),0)){
+                        if(receiver.activityInfo!=null)bootReceivers.add(receiver.activityInfo.packageName);
+                    }
+                }catch(Exception ignored){}
                 HashMap<String,Long> mostRecent=new HashMap<>();
                 if(history){
                     try{
@@ -203,17 +209,12 @@ public final class AppAuditActivity extends Activity {
                     x.version=info.versionName==null?"—":info.versionName;
                     x.overlayDeclared=permissionDeclared(info,Manifest.permission.SYSTEM_ALERT_WINDOW);
                     x.foregroundService=permissionDeclared(info,"android.permission.FOREGROUND_SERVICE");
-                    x.bootReceiver=false;
-                    // PackageInfo receivers do not expose each declared intent-filter action via this API.
-                    // No inference of BOOT_COMPLETED from the existence of a receiver alone.
-                    if(info.receivers!=null){
-                        for(ActivityInfo receiver:info.receivers){
-                            // Receiver class name alone is never proof of BOOT_COMPLETED.
-                            String cls=receiver.name==null?"":receiver.name.toLowerCase(Locale.ROOT);
-                            if(cls.contains("bootreceiver")||cls.contains("bootcompleted")){
-                                x.bootReceiver=true;break;  // heuristic label, NOT verified manifest action
-                            }
-                        }
+                    x.bootReceiver=bootReceivers.contains(x.pkg)||permissionDeclared(info,"android.permission.RECEIVE_BOOT_COMPLETED");
+                    // Only declared capabilities: no access to another app's actual job queue or scripts.
+                    x.alarmDeclared=permissionDeclared(info,"android.permission.SCHEDULE_EXACT_ALARM")||
+                        permissionDeclared(info,"android.permission.USE_EXACT_ALARM");
+                    if(info.services!=null)for(ServiceInfo service:info.services){
+                        if("android.permission.BIND_JOB_SERVICE".equals(service.permission)){x.jobService=true;break;}
                     }
                     int[] counters=events.get(x.pkg);
                     if(counters!=null){x.recentScreenEvents=counters[0];x.recentServiceEvents=counters[1];}
@@ -227,12 +228,12 @@ public final class AppAuditActivity extends Activity {
                 if(isFinishing()||isDestroyed()||token!=generation)return;
                 inventory.clear();inventory.addAll(result);
                 loading=false;scanned=error==null;
-                int overlays=0,boot=0,games=0,recent=0;
-                for(AppItem a:inventory){if(a.overlayDeclared)overlays++;if(a.bootReceiver)boot++;if(a.game)games++;if(a.recentServiceEvents>0)recent++;}
+                int overlays=0,boot=0,jobs=0,games=0,recent=0;
+                for(AppItem a:inventory){if(a.overlayDeclared)overlays++;if(a.bootReceiver)boot++;if(a.jobService||a.alarmDeclared)jobs++;if(a.game)games++;if(a.recentServiceEvents>0)recent++;}
                 scanInfo.setText(error!=null?"Не удалось завершить скан: "+error:
                     "Найдено пакетов: "+inventory.size()+"\nС запросом наложения: "+overlays+
-                    "\nВозможный автозапуск (по имени ресивера): "+boot+
-                    "\nИгры: "+games+"\nС событиями foreground-служб за 24 ч: "+recent+
+                    "\nВозможный автозапуск: "+boot+
+                    "\nЗадания/таймеры (объявлены): "+jobs+"\nИгры: "+games+"\nС событиями foreground-служб за 24 ч: "+recent+
                     "\nИстория активности: "+(history?"разрешена":"нет Usage Access"));
                 renderRows();
             });
@@ -242,12 +243,13 @@ public final class AppAuditActivity extends Activity {
         if(!query.isEmpty()&&!x.pkg.toLowerCase(Locale.ROOT).contains(query)
           &&!x.title.toLowerCase(Locale.ROOT).contains(query))return false;
         switch(currentFilter){
-            case 0:return !x.system&&(x.overlayDeclared||x.bootReceiver||x.recentServiceEvents>0);
+            case 0:return !x.system&&(x.overlayDeclared||x.bootReceiver||x.jobService||x.alarmDeclared||x.recentServiceEvents>0);
             case 1:return x.overlayDeclared;
             case 2:return x.bootReceiver;
-            case 3:return x.game;
-            case 4:return !x.system;
-            case 5:return selected.contains(x.pkg);
+            case 3:return x.jobService||x.alarmDeclared;
+            case 4:return x.game;
+            case 5:return !x.system;
+            case 6:return selected.contains(x.pkg);
             default:return true;
         }
     }
@@ -268,18 +270,19 @@ public final class AppAuditActivity extends Activity {
             pick.setOnCheckedChangeListener((b,checked)->{
                 if(checked)selected.add(app.pkg);else selected.remove(app.pkg);
                 updateCount();
-                if(currentFilter==5)renderRows();
+                if(currentFilter==6)renderRows();
             });
             item.addView(pick);
             add(item,app.pkg,10,MUTED,false,3);
             StringBuilder labels=new StringBuilder();
             if(app.overlayDeclared)labels.append("Наложения заявлены · ");
-            if(app.bootReceiver)labels.append("Возможный автозапуск · ");
+            if(app.bootReceiver)labels.append("Может стартовать при загрузке · ");
+            if(app.jobService||app.alarmDeclared)labels.append("Планировщик/таймеры · ");
             if(app.game)labels.append("Игра · ");
             if(app.recentServiceEvents>0)labels.append("Foreground: "+app.recentServiceEvents+" · ");
             if(app.recentScreenEvents>0)labels.append("На экране: "+app.recentScreenEvents+" · ");
             if(labels.length()==0)labels.append("Подозрительных признаков не выявлено");
-            add(item,labels.toString(),11,(app.overlayDeclared||app.bootReceiver)?0xffffcc83:MUTED,false,5);
+            add(item,labels.toString(),11,(app.overlayDeclared||app.bootReceiver||app.jobService||app.alarmDeclared)?0xffffcc83:MUTED,false,5);
             action(item,"Действия: "+app.title,()->manageOne(app),false);
         }
         if(count==0)add(rows,"Нет приложений по выбранным условиям.",13,MUTED,false,10);
@@ -320,8 +323,8 @@ public final class AppAuditActivity extends Activity {
             .setTitle(app.title+"\n"+app.pkg)
             .setMessage("Версия "+app.version+(app.system?" · системный пакет":"")+
                 "\nНаложения: "+(app.overlayDeclared?"заявлено разрешение":"не заявлено")+
-                "\nЗапуск после загрузки: "+(app.bootReceiver?"возможен (эвристика)":"не установлен")+
-                "\nОтложенные задачи, команды и скрипты других приложений: недоступны обычному Android API.")
+                "\nЗапуск после загрузки: "+(app.bootReceiver?"заявлена возможность":"не обнаружен")+
+                "\nJobService/точные таймеры: "+(app.jobService||app.alarmDeclared?"заявлена возможность":"не обнаружено")+"\nКонкретные отложенные задачи, команды и скрипты других приложений: недоступны обычному API.")
             .setItems(choices,(d,which)->{
                 switch(which){
                     case 0:openDetails(app);break;
