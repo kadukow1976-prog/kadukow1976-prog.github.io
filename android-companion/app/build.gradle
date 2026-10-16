@@ -1,0 +1,17 @@
+plugins { id 'com.android.application' }
+
+android {
+    namespace 'ru.kadukov.androidcontrolhub'
+    compileSdk 35
+    defaultConfig {
+        applicationId 'ru.kadukov.androidcontrolhub'
+        minSdk 26
+        targetSdk 34
+        versionCode 1
+        versionName '0.1.0-beta'
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
