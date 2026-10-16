@@ -53,6 +53,9 @@ public final class AppAuditActivity extends Activity {
     private int currentFilter=0;
     private boolean loading=false, scanned=false;
     private int generation=0;
+    private final ArrayList<AppItem> batch=new ArrayList<>();
+    private int batchIndex=0,batchMode=0;
+    private boolean batchWaiting=false;
 
     private static class AppItem {
         String pkg, title, version;
@@ -118,7 +121,11 @@ public final class AppAuditActivity extends Activity {
         search.setHint("Поиск названия или ID пакета");search.setPadding(dp(12),dp(9),dp(12),dp(9));
         search.setBackground(shape(0xff0c1c2b));controls.addView(search,space(10));
         listInfo=text("",12,GREEN,true);controls.addView(listInfo,space(9));
-        action(controls,"Системное управление выбранными",this::manageSelected,true);
+        action(controls,"Действия с выбранными приложениями",this::manageSelected,true);
+        action(controls,"Удалить выбранные через Android",()->startBatch(1),false);
+        action(controls,"Отключить выбранные через Android",()->startBatch(2),false);
+        action(controls,"Очистить кэш выбранных через Android",()->startBatch(3),false);
+        action(controls,"Очистить данные выбранных через Android",()->startBatch(4),false);
         action(controls,"Резервная копия / удалить личные файлы",()->startActivity(new Intent(this,PersonalFilesActivity.class)),false);
 
         LinearLayout listing=card("03  Приложения","Отметьте программы, которые хотите проверить или обслужить.");
@@ -143,7 +150,19 @@ public final class AppAuditActivity extends Activity {
         add(note,"• Сведения о рекламе — признаки для ручной проверки. Автоматически назвать приложение вредоносным по этим признакам нельзя.",11,MUTED,false,2);
         scan();
     }
-    @Override protected void onDestroy(){generation++;super.onDestroy();}
+    @Override protected void onDestroy(){generation++;batch.clear();super.onDestroy();}
+    @Override protected void onResume(){
+        super.onResume();
+        if(batchWaiting){
+            batchWaiting=false;
+            new AlertDialog.Builder(this)
+               .setTitle("Продолжить обработку")
+               .setMessage("Android вернул управление. Выполнение операции в настройках не подтверждено этим приложением. Продолжить к следующему выбранному пакету?")
+               .setNegativeButton("Остановить",(d,w)->stopBatch())
+               .setPositiveButton("Следующий",(d,w)->{batchIndex++;showBatchStep();})
+               .show();
+        }
+    }
     private boolean usageAllowed(){
         try{
             AppOpsManager a=(AppOpsManager)getSystemService(APP_OPS_SERVICE);
@@ -292,9 +311,70 @@ public final class AppAuditActivity extends Activity {
     private void updateCount(){
         listInfo.setText("Отмечено: "+selected.size()+"   ·   Всего в скане: "+inventory.size());
     }
-    private void manageSelected(){
+    private ArrayList<AppItem> getSelected(){
         ArrayList<AppItem> matches=new ArrayList<>();
         for(AppItem app:inventory)if(selected.contains(app.pkg))matches.add(app);
+        return matches;
+    }
+    private void stopBatch(){
+        batch.clear();batchIndex=0;batchMode=0;batchWaiting=false;
+    }
+    private String batchName(){
+        switch(batchMode){
+            case 1:return "Удаление";
+            case 2:return "Отключение";
+            case 3:return "Очистка кэша";
+            case 4:return "Очистка данных";
+            default:return "Операция";
+        }
+    }
+    private void startBatch(int mode){
+        ArrayList<AppItem> chosen=getSelected();
+        if(chosen.isEmpty()){
+            Toast.makeText(this,"Сначала отметьте приложения в списке.",Toast.LENGTH_LONG).show();return;
+        }
+        if(mode==1){
+            chosen.removeIf(item->item.system||item.pkg.equals(getPackageName()));
+            if(chosen.isEmpty()){
+                Toast.makeText(this,"Системные приложения нельзя удалять пакетным сценарием.",Toast.LENGTH_LONG).show();return;
+            }
+        }
+        stopBatch();batch.addAll(chosen);batchMode=mode;
+        new AlertDialog.Builder(this)
+            .setTitle(batchName()+" · "+batch.size()+" приложений")
+            .setMessage("Это последовательная процедура: для КАЖДОГО приложения Android потребует ручное подтверждение. Ничего не очищается скрытно.\n\n"+
+                (mode==4||mode==1?"ВНИМАНИЕ: данные приложений могут быть безвозвратно удалены. Сначала создайте резервные копии в самих приложениях и сохраните доступные личные документы.":"Проверяйте назначение программы перед действием."))
+            .setNeutralButton("Сначала сохранить файлы",(d,w)->{stopBatch();startActivity(new Intent(this,PersonalFilesActivity.class));})
+            .setNegativeButton("Отмена",(d,w)->stopBatch())
+            .setPositiveButton("Начать",(d,w)->showBatchStep()).show();
+    }
+    private void showBatchStep(){
+        if(batchIndex>=batch.size()){
+            int total=batch.size();String label=batchName();stopBatch();
+            new AlertDialog.Builder(this)
+                .setTitle("Список обработан")
+                .setMessage("Системные экраны открывались последовательно для "+total+" приложений.\n\nЭто НЕ подтверждение удаления или очистки: проверяйте состояние в Android.\n\n"+label+" завершено только для тех программ, где вы подтвердили действие в системе.")
+                .setPositiveButton("Обновить скан",(d,w)->scan())
+                .setNegativeButton("Закрыть",null).show();
+            return;
+        }
+        AppItem current=batch.get(batchIndex);
+        final String desc=(batchMode==1?"Android откроет окно удаления. Приложение может потерять свои приватные данные.":
+            batchMode==4?"На системной карточке найдите «Память / Хранилище» → «Очистить данные». Это может удалить аккаунты, настройки и файлы.":
+            batchMode==3?"На системной карточке найдите «Память / Хранилище» → «Очистить кэш». Android не разрешает обычной утилите очищать его напрямую.":
+            "В системной карточке найдите «Отключить» (если доступно). Нельзя отключать критические службы.");
+        new AlertDialog.Builder(this).setTitle(batchName()+" · "+(batchIndex+1)+"/"+batch.size())
+          .setMessage(current.title+"\n"+current.pkg+"\n\n"+desc)
+          .setNeutralButton("Пропустить",(d,w)->{batchIndex++;showBatchStep();})
+          .setNegativeButton("Остановить",(d,w)->stopBatch())
+          .setPositiveButton("Открыть Android",(d,w)->{
+              batchWaiting=true;
+              if(batchMode==1)launch(new Intent(Intent.ACTION_DELETE,Uri.parse("package:"+current.pkg)));
+              else openDetails(current);
+          }).show();
+    }
+    private void manageSelected(){
+        ArrayList<AppItem> matches=getSelected();
         if(matches.isEmpty()){
             Toast.makeText(this,"Сначала отметьте приложения галочками.",Toast.LENGTH_LONG).show();return;
         }
