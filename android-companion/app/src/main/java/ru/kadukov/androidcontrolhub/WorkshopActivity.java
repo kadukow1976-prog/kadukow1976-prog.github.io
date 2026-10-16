@@ -229,7 +229,7 @@ public class WorkshopActivity extends Activity {
         LinearLayout page=page("Обзор устройства","Только настоящие параметры Android. Сканирование выполняется локально.");
         LinearLayout device=card(page,"📱 "+Build.MANUFACTURER+" "+Build.MODEL,"Android "+Build.VERSION.RELEASE+" · API "+Build.VERSION.SDK_INT);
         addValue(device,"Устройство",Build.DEVICE);
-        addValue(device,"Процессор",Build.SOC_MODEL!=null && Build.VERSION.SDK_INT>=31?Build.SOC_MODEL:"См. данные устройства");
+        addValue(device,"Процессор",Build.VERSION.SDK_INT>=31 && Build.SOC_MODEL!=null?Build.SOC_MODEL:"См. данные устройства");
         addValue(device,"Архитектура",Build.SUPPORTED_ABIS.length>0?Build.SUPPORTED_ABIS[0]:"Нет данных");
         addValue(device,"Логические ядра",String.valueOf(Runtime.getRuntime().availableProcessors()));
         android.util.DisplayMetrics metrics=getResources().getDisplayMetrics();
