@@ -33,16 +33,16 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if gh release view android-hub-beta-0.3 >/dev/null 2>&1; then
+          if gh release view android-hub-beta-0.4 >/dev/null 2>&1; then
             echo "Existing beta release preserved to avoid changing debug signing key."
             exit 0
           fi
-          cp android-companion/app/build/outputs/apk/debug/app-debug.apk android-hub-beta-0.3.apk
-          gh release create android-hub-beta-0.3 android-hub-beta-0.3.apk \
+          cp android-companion/app/build/outputs/apk/debug/app-debug.apk android-hub-beta-0.4.apk
+          gh release create android-hub-beta-0.4 android-hub-beta-0.4.apk \
             --target "$GITHUB_SHA" \
-            --title "Android Control Hub 0.3 Beta — TEST APK" \
+            --title "Android Control Hub 0.4 Beta — TEST APK" \
             --prerelease \
-            --notes "Тестовый выпуск 0.3: локальный журнал активности Android UsageEvents с запусками на экране и foreground-службами, фильтрами, экспортом CSV, плюс возможности 0.2. Важное: подпись тестовой сборки отличается от предыдущего APK, поэтому перед установкой 0.2 может потребоваться удалить 0.1. Контакты передаются только при вашем подтверждении. Без удалённого скрытого управления; не финальный релиз для клиентов."
+            --notes "Тестовая версия 0.4: центр индивидуальных разрешений и аппаратных проверок (SIM, камера, микрофон, GPS, Bluetooth, уведомления). Доступ Usage Access по-прежнему выдаётся только в настройках. Включает функции 0.3. Важное: подпись тестовой сборки отличается от предыдущего APK, поэтому перед установкой 0.4 может потребоваться удалить старый debug APK. Контакты передаются только при вашем подтверждении. Без удалённого скрытого управления; не финальный релиз для клиентов."
       - uses: actions/upload-artifact@v4
         with:
           name: android-control-hub-debug-apk

@@ -4,6 +4,15 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
     <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS"/>
     <uses-permission android:name="android.permission.VIBRATE"/>
+    <!-- Runtime: user-initiated device diagnostics -->
+    <uses-permission android:name="android.permission.CAMERA"/>
+    <uses-permission android:name="android.permission.RECORD_AUDIO"/>
+    <uses-permission android:name="android.permission.READ_PHONE_STATE"/>
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
+    <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30"/>
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT"/>
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <queries>
       <intent>
         <action android:name="android.intent.action.MAIN"/>
@@ -22,5 +31,6 @@
         </activity>
         <activity android:name=".MainActivity" android:exported="false"/>
         <activity android:name=".ActivityMonitorActivity" android:exported="false"/>
+        <activity android:name=".PermissionsActivity" android:exported="false"/>
     </application>
 </manifest>
