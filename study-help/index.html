@@ -470,7 +470,7 @@ h1{font-size:clamp(39px,10.1vw,53px)}.hero p{font-size:15px;line-height:1.8}
     var label=select.options[select.selectedIndex].text.split(" — от ")[0];
     var details=document.getElementById("request-details").value.trim();
     var desired=document.getElementById("request-date").value;
-    var msg="Здравствуйте, Александр! Хочу уточнить стоимость и возможность помощи.\\n\\nУслуга: "+label+"\\nСрок: "+displayDate(desired)+"\\nЗадание: "+(details||"Подробности пришлю в переписке.")+"\\n\\nПодскажите, пожалуйста, условия.";
+    var msg="Здравствуйте, Александр! Хочу уточнить стоимость и возможность помощи.\n\nУслуга: "+label+"\nСрок: "+displayDate(desired)+"\nЗадание: "+(details||"Подробности пришлю в переписке.")+"\n\nПодскажите, пожалуйста, условия.";
     var status=document.getElementById("request-status");
     function success(ok){status.textContent=ok?"Заявка скопирована. Отправьте её в Telegram или VK.":"Не удалось скопировать — напишите напрямую в мессенджер.";}
     if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(msg).then(function(){success(true);}).catch(function(){success(fallbackCopy(msg));});}
