@@ -1,0 +1,19 @@
+{
+  "name": "Android Control Hub",
+  "short_name": "Android Hub",
+  "description": "Диагностика доступных браузеру параметров Android, контакты VCF и безопасные инструкции.",
+  "lang": "ru",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#090f1b",
+  "theme_color": "#090f1b",
+  "icons": [
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
