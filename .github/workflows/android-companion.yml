@@ -7,7 +7,7 @@ on:
       - ".github/workflows/android-companion.yml"
   workflow_dispatch:
 permissions:
-  contents: read
+  contents: write
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -29,6 +29,20 @@ jobs:
       - name: Compile debug APK
         working-directory: android-companion
         run: gradle --no-daemon :app:assembleDebug
+      - name: Publish beta APK to GitHub Releases (first build only)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view android-hub-beta-0.1 >/dev/null 2>&1; then
+            echo "Existing beta release preserved to avoid changing debug signing key."
+            exit 0
+          fi
+          cp android-companion/app/build/outputs/apk/debug/app-debug.apk android-hub-beta-0.1.apk
+          gh release create android-hub-beta-0.1 android-hub-beta-0.1.apk \
+            --target "$GITHUB_SHA" \
+            --title "Android Control Hub 0.1 Beta — TEST APK" \
+            --prerelease \
+            --notes "Тестовая Android-сборка: установка только с явного согласия владельца. Никакого скрытого удалённого управления. Контакты экспортируются только после разрешения READ_CONTACTS. Каждая новая debug-сборка может требовать удаления предыдущей версии. Не используйте как финальный клиентский релиз."
       - uses: actions/upload-artifact@v4
         with:
           name: android-control-hub-debug-apk
