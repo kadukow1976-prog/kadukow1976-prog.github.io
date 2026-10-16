@@ -33,16 +33,16 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if gh release view android-hub-beta-0.5 >/dev/null 2>&1; then
+          if gh release view android-hub-beta-0.6 >/dev/null 2>&1; then
             echo "Existing beta release preserved to avoid changing debug signing key."
             exit 0
           fi
-          cp android-companion/app/build/outputs/apk/debug/app-debug.apk android-hub-beta-0.5.apk
-          gh release create android-hub-beta-0.5 android-hub-beta-0.5.apk \
+          cp android-companion/app/build/outputs/apk/debug/app-debug.apk android-hub-beta-0.6.apk
+          gh release create android-hub-beta-0.6 android-hub-beta-0.6.apk \
             --target "$GITHUB_SHA" \
-            --title "Android Control Hub 0.5 Beta — TEST APK" \
+            --title "Android Control Hub 0.6 Beta — TEST APK" \
             --prerelease \
-            --notes "Тестовая версия 0.5: центр запросов всех применимых диагностических runtime-разрешений по явному согласию с предварительным списком, сохранено отдельное управление каждым разрешением. Usage Access выдаётся отдельно через Android. Включает функции 0.4. Важное: подпись тестовой сборки отличается от предыдущего APK, поэтому перед установкой 0.4 может потребоваться удалить старый debug APK. Контакты передаются только при вашем подтверждении. Без удалённого скрытого управления; не финальный релиз для клиентов."
+            --notes "Тестовая версия 0.6: локальное автоматическое сканирование установленных приложений, наложения окон, игры, автозапуск, объявленные JobService и таймеры, выбор приложений и последовательное системное управление (удаление, отключение, очистка кэша/данных) с ручным подтверждением для каждой программы. Отдельное резервирование и удаление только лично выбранных файлов через Android SAF. Доступ к приватным данным других приложений отсутствует. Важное: подпись тестовой сборки отличается от предыдущего APK, поэтому перед установкой 0.6 может потребоваться удалить старый debug APK. Контакты передаются только при вашем подтверждении. Без удалённого скрытого управления; не финальный релиз для клиентов."
       - uses: actions/upload-artifact@v4
         with:
           name: android-control-hub-debug-apk

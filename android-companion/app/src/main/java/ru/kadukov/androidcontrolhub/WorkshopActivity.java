@@ -167,7 +167,7 @@ public class WorkshopActivity extends Activity {
         setContentView(shell);
         LinearLayout top=vertical();top.setBackgroundColor(Color.rgb(12,22,35));pad(top,18,11);
         addText(top,"ANDROID  CONTROL  HUB",11,GREEN,true,0);
-        addText(top,"Сервисная панель  ·  0.5 Beta",20,WHITE,true,0);
+        addText(top,"Сервисная панель  ·  0.6 Beta",20,WHITE,true,0);
         shell.addView(top,new LinearLayout.LayoutParams(-1,dp(83)));
         contentFrame=new FrameLayout(this);
         shell.addView(contentFrame,new LinearLayout.LayoutParams(-1,0,1));
@@ -263,7 +263,8 @@ public class WorkshopActivity extends Activity {
         addBtn(batt,"Обновить параметры",true,this::showOverview);
 
         LinearLayout quick=card(page,"Быстрые действия","Выбери раздел сервисного обслуживания.");
-        addBtn(quick,"Центр разрешений Android",true,()->startActivity(new Intent(this,PermissionsActivity.class)));
+        addBtn(quick,"Автоскан: реклама, игры, наложения и автозапуск",true,()->startActivity(new Intent(this,AppAuditActivity.class)));
+        addBtn(quick,"Центр разрешений Android",false,()->startActivity(new Intent(this,PermissionsActivity.class)));
         addBtn(quick,"Журнал активности: экран и фоновые службы",false,()->startActivity(new Intent(this,ActivityMonitorActivity.class)));
         addBtn(quick,"Установленные приложения и разрешения",false,()->showTab(1));
         addBtn(quick,"Тесты экрана, вибрации, звука, датчиков",false,()->showTab(2));
@@ -316,6 +317,9 @@ public class WorkshopActivity extends Activity {
     private void showApps(){
         LinearLayout page=page("Приложения","Поиск, сортировка, разрешения и системное управление. Без скрытого удаления.");
         scanApps();
+        LinearLayout auditCard=card(page,"Автоматический аудит приложений",
+            "Все пакеты, возможные наложения, автозапуск, планировщик, игры; выбор программ для системных действий.");
+        addBtn(auditCard,"Автосканирование и управление выбранными",true,()->startActivity(new Intent(this,AppAuditActivity.class)));
         LinearLayout permissionAccess=card(page,"Центр разрешений","Проверка доступов, SIM, микрофона, камеры, GPS, Bluetooth и уведомлений.");
         addBtn(permissionAccess,"Открыть центр разрешений",true,()->startActivity(new Intent(this,PermissionsActivity.class)));
         LinearLayout activityAccess=card(page,"История использования Android","События открытия приложений и foreground-служб. Доступ выдаётся в системных настройках.");
@@ -613,6 +617,10 @@ public class WorkshopActivity extends Activity {
     }
     private void showData(){
         LinearLayout page=page("Данные и инструменты","Расширенные операции открываются в проверенной версии 0.1.");
+        LinearLayout scanner=card(page,"Проверка рекламы и управление приложениями",
+            "Сканирование при открытии, выбор программ, системная очистка кэша / данных, удаление, резервное копирование.");
+        addBtn(scanner,"Открыть контроль приложений",true,()->startActivity(new Intent(this,AppAuditActivity.class)));
+        addBtn(scanner,"Резервная копия / удалить выбранные файлы",false,()->startActivity(new Intent(this,PersonalFilesActivity.class)));
         LinearLayout rights=card(page,"Центр разрешений","Все доступные диагностические разрешения, специальные доступы и проверки.");
         addBtn(rights,"Открыть центр разрешений",true,()->startActivity(new Intent(this,PermissionsActivity.class)));
         LinearLayout audit=card(page,"Активность приложений · AppUsage","История запусков на экране и зарегистрированных foreground-служб, поиск, фильтры, CSV.");
@@ -623,7 +631,7 @@ public class WorkshopActivity extends Activity {
         addBtn(android,"Настройки приложений",false,()->safelyLaunch(new Intent(Settings.ACTION_APPLICATION_SETTINGS)));
         addBtn(android,"Сведения об устройстве",false,()->safelyLaunch(new Intent(Settings.ACTION_DEVICE_INFO_SETTINGS)));
         addBtn(android,"Настройки Wi-Fi",false,()->safelyLaunch(new Intent(Settings.ACTION_WIFI_SETTINGS)));
-        LinearLayout about=card(page,"О приложении","Android Control Hub 0.5 Beta · локальная сервисная утилита.");
+        LinearLayout about=card(page,"О приложении","Android Control Hub 0.6 Beta · локальная сервисная утилита.");
         addText(about,"Доступ к файлам предоставляется только через системный выбор. Контакты экспортируются только по отдельному запросу. Ни пароли, ни SMS, ни содержимое других приложений не собираются.",12,MUTE,false,12);
         addBtn(about,"Открыть веб-сайт",false,()->safelyLaunch(new Intent(Intent.ACTION_VIEW,Uri.parse("https://kadukow1976-prog.github.io/android-control-hub/"))));
     }

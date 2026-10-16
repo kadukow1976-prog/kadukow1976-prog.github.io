@@ -13,6 +13,8 @@
     <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30"/>
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT"/>
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <!-- Core local installed-app audit requires complete installed package inventory. -->
+    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES"/>
     <queries>
       <intent>
         <action android:name="android.intent.action.MAIN"/>
@@ -32,5 +34,7 @@
         <activity android:name=".MainActivity" android:exported="false"/>
         <activity android:name=".ActivityMonitorActivity" android:exported="false"/>
         <activity android:name=".PermissionsActivity" android:exported="false"/>
+        <activity android:name=".AppAuditActivity" android:exported="false"/>
+        <activity android:name=".PersonalFilesActivity" android:exported="false"/>
     </application>
 </manifest>
