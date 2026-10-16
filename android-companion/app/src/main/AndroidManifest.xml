@@ -36,5 +36,6 @@
         <activity android:name=".PermissionsActivity" android:exported="false"/>
         <activity android:name=".AppAuditActivity" android:exported="false"/>
         <activity android:name=".PersonalFilesActivity" android:exported="false"/>
+        <activity android:name=".TransferHubActivity" android:exported="false"/>
     </application>
 </manifest>

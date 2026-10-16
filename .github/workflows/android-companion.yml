@@ -33,16 +33,16 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if gh release view android-hub-beta-0.6 >/dev/null 2>&1; then
+          if gh release view android-hub-beta-0.7 >/dev/null 2>&1; then
             echo "Existing beta release preserved to avoid changing debug signing key."
             exit 0
           fi
-          cp android-companion/app/build/outputs/apk/debug/app-debug.apk android-hub-beta-0.6.apk
-          gh release create android-hub-beta-0.6 android-hub-beta-0.6.apk \
+          cp android-companion/app/build/outputs/apk/debug/app-debug.apk android-hub-beta-0.7.apk
+          gh release create android-hub-beta-0.7 android-hub-beta-0.7.apk \
             --target "$GITHUB_SHA" \
-            --title "Android Control Hub 0.6 Beta — TEST APK" \
+            --title "Android Control Hub 0.7 Beta — TEST APK" \
             --prerelease \
-            --notes "Тестовая версия 0.6: локальное автоматическое сканирование установленных приложений, наложения окон, игры, автозапуск, объявленные JobService и таймеры, выбор приложений и последовательное системное управление (удаление, отключение, очистка кэша/данных) с ручным подтверждением для каждой программы. Отдельное резервирование и удаление только лично выбранных файлов через Android SAF. Доступ к приватным данным других приложений отсутствует. Важное: подпись тестовой сборки отличается от предыдущего APK, поэтому перед установкой 0.6 может потребоваться удалить старый debug APK. Контакты передаются только при вашем подтверждении. Без удалённого скрытого управления; не финальный релиз для клиентов."
+            --notes "Тестовая версия 0.7: системная передача файлов Android ↔ Android/Windows Quick Share, USB-MTP инструкция, ZIP выбранных файлов со списком приложений, восстановление файлов через SAF, ручная переустановка через Google Play, передача ссылки или export base APK (без split/данных). Пароли и закрытые файлы других программ не читаются, полного образа системы нет. Сохранены функции 0.6. Важное: подпись тестовой сборки отличается от предыдущего APK, поэтому перед установкой 0.7 может потребоваться удалить старый debug APK. Контакты передаются только при вашем подтверждении. Без удалённого скрытого управления; не финальный релиз для клиентов."
       - uses: actions/upload-artifact@v4
         with:
           name: android-control-hub-debug-apk
