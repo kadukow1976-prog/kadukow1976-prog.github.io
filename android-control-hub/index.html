@@ -65,6 +65,17 @@ button,input{font:inherit}button{cursor:pointer}button:disabled{cursor:not-allow
 .resource-preview .btn{min-height:37px}
 @media(max-width:580px){.service-grid{grid-template-columns:1fr}.service-card{padding:14px 15px}.resource-preview{align-items:stretch}.resource-preview .btn{width:100%}}
 
+
+.native-block{border:1px solid #2e7764;background:linear-gradient(130deg,#11352e,#122738 85%);border-radius:17px;padding:20px;margin-top:19px;display:flex;gap:16px;align-items:flex-start}
+.native-block .native-glyph{display:grid;place-items:center;width:42px;height:42px;flex:0 0 42px;color:#5ef0bd;background:#16503f;border-radius:13px}
+.native-glyph svg{width:23px;height:23px}
+.native-copy{flex:1;min-width:0}.native-copy h3{font-size:16px;margin:0 0 4px;color:#f4fff8}.native-copy p{color:#adcfc5;font-size:12px;line-height:1.7;margin:0 0 11px}
+.native-actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.native-note{color:#b4c8d6;font-size:11px;line-height:1.7;margin-top:10px}
+.native-steps{padding-left:22px;margin:10px 0;color:#a9c4d7;font-size:12px;line-height:1.8}
+.native-actions .btn{min-width:0}
+@media(max-width:520px){.native-block{padding:15px;gap:11px}.native-block .native-glyph{width:35px;height:35px;flex-basis:35px}.native-actions .btn{width:100%}}
+
   </style>
 
 </head>
@@ -113,7 +124,7 @@ button,input{font:inherit}button{cursor:pointer}button:disabled{cursor:not-allow
         <span class="privacy-icon"><svg><use href="#ico-lock"/></svg></span>
         <div><strong>Приватная обработка</strong><p>Без аккаунта и скрытой передачи файлов</p></div>
       </div>
-      <p class="sidebar-version">Версия 1.2 · Веб-приложение</p>
+      <p class="sidebar-version">Версия 1.3 · Веб-приложение</p>
     </aside>
 
     <div class="main-shell">
@@ -145,7 +156,16 @@ button,input{font:inherit}button{cursor:pointer}button:disabled{cursor:not-allow
             <button class="action-card" type="button" data-view-target="tools" data-tool="contacts"><span class="icon-box green"><svg><use href="#ico-contact"/></svg></span><span class="action-text"><strong>Контакты</strong><small>Резервная копия VCF</small></span><svg class="arrow-icon"><use href="#ico-arrow"/></svg></button>
             <button class="action-card" type="button" data-view-target="tools" data-tool="files"><span class="icon-box purple"><svg><use href="#ico-share"/></svg></span><span class="action-text"><strong>Передача файлов</strong><small>Через меню «Поделиться»</small></span><svg class="arrow-icon"><use href="#ico-arrow"/></svg></button>
           </div>
-          <div class="resource-preview"><div><strong>Сервисы и приложения Android</strong><p>Защита, файлы, контакты и резервные копии</p></div><button type="button" class="btn btn-secondary" data-view-target="tools" data-tool="services">Смотреть сервисы <svg aria-hidden="true"><use href="#ico-arrow"/></svg></button></div>
+          <article class="native-block" aria-label="Приложение Android Control Hub">
+<span class="native-glyph"><svg><use href="#ico-phone"/></svg></span>
+<div class="native-copy"><h3>Нативный клиент Android</h3>
+<p>Реальная диагностика батареи, памяти и приложений, экспорт VCF и передача файлов — с разрешения владельца устройства.</p>
+<div class="native-actions">
+<a class="btn btn-primary" href="https://github.com/kadukow1976-prog/kadukow1976-prog.github.io/releases/download/android-hub-beta-0.1/android-hub-beta-0.1.apk" rel="noopener noreferrer"><svg><use href="#ico-download"/></svg>Скачать APK 0.1 Beta</a>
+<button class="btn btn-secondary" type="button" data-view-target="tools" data-tool="client">Как установить</button>
+</div><div class="native-note">Тестовая версия. Разрешения запрашиваются по необходимости; скрытого доступа и удалённого управления нет.</div>
+</div></article>
+<div class="resource-preview"><div><strong>Сервисы и приложения Android</strong><p>Защита, файлы, контакты и резервные копии</p></div><button type="button" class="btn btn-secondary" data-view-target="tools" data-tool="services">Смотреть сервисы <svg aria-hidden="true"><use href="#ico-arrow"/></svg></button></div>
 <div class="notice notice-neutral"><svg><use href="#ico-info"/></svg><div><strong>Что умеет браузер</strong><p>Веб-сайт не имеет доступа к системному кэшу, скрытым файлам, антивирусному сканированию или сбросу Android. Мы показываем только реальные доступные данные и безопасные инструкции.</p></div></div>
         </section>
 
@@ -197,7 +217,7 @@ button,input{font:inherit}button{cursor:pointer}button:disabled{cursor:not-allow
 
         <section class="view" id="view-tools" data-view="tools" aria-labelledby="tools-heading" hidden>
           <div class="view-heading"><div><p class="eyebrow">ПОЛЕЗНЫЕ ДЕЙСТВИЯ</p><h2 id="tools-heading">Инструменты</h2><p>Всё выполняется локально в браузере и только после вашего действия.</p></div></div>
-          <div class="tool-jump"><button type="button" data-scroll-tool="contacts">Контакты</button><button type="button" data-scroll-tool="files">Файлы</button><button type="button" data-scroll-tool="services">Сервисы</button><button type="button" data-scroll-tool="cleanup">Очистка</button><button type="button" data-scroll-tool="reset">Сброс</button></div>
+          <div class="tool-jump"><button type="button" data-scroll-tool="contacts">Контакты</button><button type="button" data-scroll-tool="files">Файлы</button><button type="button" data-scroll-tool="client">Android-клиент</button><button type="button" data-scroll-tool="services">Сервисы</button><button type="button" data-scroll-tool="cleanup">Очистка</button><button type="button" data-scroll-tool="reset">Сброс</button></div>
 
           <article class="tool-card" id="tool-contacts">
             <div class="tool-card-head"><span class="icon-box blue"><svg><use href="#ico-contact"/></svg></span><div><h3>Контакты</h3><p>Резервная копия выбранных контактов в формате VCF</p></div></div>
@@ -212,6 +232,25 @@ button,input{font:inherit}button{cursor:pointer}button:disabled{cursor:not-allow
             <div class="tool-card-body"><label id="drop-zone" class="drop-zone" for="file-input"><svg><use href="#ico-upload"/></svg><strong>Выбрать файлы</strong><span>Или перетащить их сюда на компьютере</span><input type="file" id="file-input" multiple hidden></label><div id="selected-files" class="selected-files" hidden><div class="files-heading"><strong id="files-count">0 файлов</strong><button type="button" class="text-btn" id="clear-files">Очистить список</button></div><ul id="files-list"></ul></div><button type="button" class="btn btn-primary" id="share-files" disabled><svg><use href="#ico-share"/></svg>Поделиться выбранными файлами</button><p class="muted small">Передача на компьютер напрямую по Wi‑Fi требует отдельного приложения или сервера. Можно использовать Quick Share, USB или другой доступный способ в системном меню.</p><div class="resource-links"><a class="service-link" href="https://play.google.com/store/apps/details?id=com.google.android.apps.nbu.files&hl=ru" target="_blank" rel="noopener noreferrer">Files by Google<svg aria-hidden="true"><use href="#ico-arrow"/></svg></a> <a class="service-link" href="https://www.android.com/quick-share/with-windows-pc/" target="_blank" rel="noopener noreferrer">Quick Share для ПК<svg aria-hidden="true"><use href="#ico-arrow"/></svg></a></div></div>
           </article>
 
+<article class="tool-card" id="tool-client">
+<div class="tool-card-head"><span class="icon-box green"><svg><use href="#ico-phone"/></svg></span><div><h3>Android Control Hub — нативный клиент</h3><p>APK-утилита для диагностики на самом телефоне</p></div></div>
+<div class="tool-card-body">
+<p>В отличие от браузера, APK может получить сведения о батарее, оперативной памяти, разделе данных и приложениях. Все доступы включаются самим владельцем по запросу.</p>
+<div class="native-actions">
+<a class="btn btn-primary" href="https://github.com/kadukow1976-prog/kadukow1976-prog.github.io/releases/download/android-hub-beta-0.1/android-hub-beta-0.1.apk" rel="noopener noreferrer"><svg><use href="#ico-download"/></svg>Скачать APK (бета)</a>
+<a class="btn btn-secondary" href="https://github.com/kadukow1976-prog/kadukow1976-prog.github.io/tree/main/android-companion" target="_blank" rel="noopener noreferrer">Исходный код <svg><use href="#ico-arrow"/></svg></a>
+<a class="btn btn-quiet" href="intent://open/diagnostics#Intent;scheme=androidhub;package=ru.kadukov.androidcontrolhub;end">Открыть установленный клиент</a>
+</div>
+<h3 style="font-size:14px;margin:18px 0 7px">Установка и права</h3>
+<ol class="native-steps">
+<li>Скачайте APK с GitHub Releases и откройте загрузку на телефоне.</li>
+<li>Если Android попросит, однократно разрешите установку из выбранного источника.</li>
+<li>Откройте клиент: диагностика работает без доступа к контактам и файлам.</li>
+<li>Для VCF отдельно разрешите «Контакты», для передачи файлов выберите документы вручную.</li>
+<li>Для статистики использования отдельно включите Usage Access в системных настройках.</li>
+</ol>
+<div class="notice notice-neutral"><svg><use href="#ico-info"/></svg><div><strong>Тестовый выпуск</strong><p>APK не даёт root, Device Owner, автоматического управления системой или доступа к паролям. Тестовая отладочная подпись; массовое использование возможно после испытаний и выпуска подписанной release-версии.</p></div></div>
+</div></article>
 <article class="tool-card" id="tool-services">
 <div class="tool-card-head"><span class="icon-box green"><svg><use href="#ico-grid"/></svg></span><div><h3>Сервисы и приложения Android</h3><p>Официальные сайты, справка и Google Play</p></div></div>
 <div class="tool-card-body"><p class="service-intro">Нажмите карточку, чтобы открыть внешний сайт или страницу приложения. Для некоторых сервисов потребуется аккаунт Google и интернет. Переход по ссылке не запускает сканирование, удаление или установку без вашего подтверждения.</p>
