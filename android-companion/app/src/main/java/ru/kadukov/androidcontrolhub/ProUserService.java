@@ -39,6 +39,13 @@ public final class ProUserService extends Binder {
             &&!id.startsWith("com.qualcomm.")&&!id.startsWith("com.mediatek.")
             &&!id.equals("ru.kadukov.androidcontrolhub");
     }
+    private static boolean isSystemEntry(String result,String pkg){
+        java.util.StringTokenizer tokens=new java.util.StringTokenizer(result);
+        while(tokens.hasMoreTokens()){
+            if(("package:"+pkg).equals(tokens.nextToken()))return true;
+        }
+        return false;
+    }
     private static String execute(String operation,String pkg){
         if(!safe(pkg))return "ОТКАЗ: неподходящий пакет.";
         if(!"CACHE".equals(operation)&&!"DATA".equals(operation)&&!"DISABLE".equals(operation))
@@ -49,10 +56,10 @@ public final class ProUserService extends Binder {
             String location=invoke("/system/bin/pm","path","--user",user,pkg);
             if(!location.contains("package:"))return "ОТКАЗ: пакет не обнаружен.";
             String systems=invoke("/system/bin/pm","list","packages","-s","--user",user);
-            if(systems.contains("package:"+pkg+"\\n")||systems.trim().endsWith("package:"+pkg))
+            if(isSystemEntry(systems,pkg))
                 return "ОТКАЗ: приложение имеет системный статус.";
             if(location.contains("package:/system/")||location.contains("package:/product/")
-                ||location.contains("package:/vendor/")||location.contains("package:/system_ext/"))
+                ||location.contains("package:/vendor/")||location.contains("package:/system_ext/")||location.contains("package:/apex/")||location.contains("package:/odm/"))
                 return "ОТКАЗ: системный пакет.";
             String out;
             if("CACHE".equals(operation)){
