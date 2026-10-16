@@ -293,7 +293,7 @@ public final class ProActivity extends Activity {
         if(binder==null||!binder.isBinderAlive()){alert("Shizuku","Соединение потеряно. Очередь остановлена.");queue.clear();return;}
         busy=true;
         String mode=action;
-        logText.setText("Выполняется: "+app.pkg+"…");
+        logText.append("\nВыполняется: "+app.pkg+"…");
         new Thread(()->{
             String out;
             Parcel data=Parcel.obtain(),reply=Parcel.obtain();
@@ -336,14 +336,14 @@ public final class ProActivity extends Activity {
     }
     private void chooseExportFile(){
         Intent intent=new Intent(Intent.ACTION_CREATE_DOCUMENT);intent.addCategory(Intent.CATEGORY_OPENABLE);
-        intent.setType("text/plain");intent.putExtra(Intent.EXTRA_TITLE,"AndroidHub-PRO-0.8.cmd");
+        intent.setType("text/plain");intent.putExtra(Intent.EXTRA_TITLE,"AndroidHub-PRO-0.8.1.cmd");
         try{startActivityForResult(intent,REQ_SAVE_CMD);}
         catch(Exception e){toast("Сохранение сценария недоступно");}
     }
     private String batchScript(){
         ArrayList<App> apps=chosen();
         StringBuilder cmd=new StringBuilder("@echo off\r\nsetlocal EnableExtensions DisableDelayedExpansion\r\n");
-        cmd.append("echo Android Control Hub PRO 0.8 - manual approval required\r\n");
+        cmd.append("echo Android Control Hub PRO 0.8.1 - manual approval required\r\n");
         cmd.append("where adb >nul 2>&1 || (echo ERROR: Install Android Platform Tools first & pause & exit /b 1)\r\n");
         cmd.append("adb get-state 2>nul | findstr /C:\"device\" >nul || (echo ERROR: One authorized device required & pause & exit /b 1)\r\n");
         cmd.append("set \"U=\"\r\nfor /f \"delims=\" %%A in ('adb shell am get-current-user 2^>nul') do set \"U=%%A\"\r\n");

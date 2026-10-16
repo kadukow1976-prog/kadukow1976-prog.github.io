@@ -1,8 +1,12 @@
-# Android Control Hub — сервисное приложение 0.8 Beta
+# Android Control Hub — сервисное приложение 0.8.1 Beta
 
-[Скачать тестовый APK 0.8](https://github.com/kadukow1976-prog/kadukow1976-prog.github.io/releases/download/android-hub-beta-0.8/android-hub-beta-0.8.apk) · [Сайт](https://kadukow1976-prog.github.io/android-control-hub/)
+[Скачать тестовый APK 0.8](https://github.com/kadukow1976-prog/kadukow1976-prog.github.io/releases/download/android-hub-beta-0.8.1/android-hub-beta-0.8.1.apk) · [Сайт](https://kadukow1976-prog.github.io/android-control-hub/)
 
-## Версия 0.8 PRO: Shizuku UserService и Windows ADB
+## Версия 0.8.1 PRO: Shizuku UserService и Windows ADB
+
+**Исправления 0.8.1:** системные пакеты защищены также по точному перечню `pm list packages -s`, включая обновлённые системные приложения; журнал результатов не затирается перед следующей командой. Используйте 0.8.1, не первоначальный APK 0.8.
+
+
 
 Вход: **Обзор → PRO: Shizuku и ADB · обслуживание приложений**, либо **Данные → Сервисный режим PRO**.
 

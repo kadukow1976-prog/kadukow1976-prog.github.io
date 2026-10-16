@@ -7,8 +7,8 @@ android {
         applicationId 'ru.kadukov.androidcontrolhub'
         minSdk 26
         targetSdk 34
-        versionCode 8
-        versionName '0.8.0-beta'
+        versionCode 9
+        versionName '0.8.1-beta'
     }
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
