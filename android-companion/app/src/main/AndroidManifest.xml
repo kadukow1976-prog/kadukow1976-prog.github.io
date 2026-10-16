@@ -21,5 +21,6 @@
             </intent-filter>
         </activity>
         <activity android:name=".MainActivity" android:exported="false"/>
+        <activity android:name=".ActivityMonitorActivity" android:exported="false"/>
     </application>
 </manifest>
