@@ -167,7 +167,7 @@ public class WorkshopActivity extends Activity {
         setContentView(shell);
         LinearLayout top=vertical();top.setBackgroundColor(Color.rgb(12,22,35));pad(top,18,11);
         addText(top,"ANDROID  CONTROL  HUB",11,GREEN,true,0);
-        addText(top,"Сервисная панель  ·  0.2 Beta",20,WHITE,true,0);
+        addText(top,"Сервисная панель  ·  0.3 Beta",20,WHITE,true,0);
         shell.addView(top,new LinearLayout.LayoutParams(-1,dp(83)));
         contentFrame=new FrameLayout(this);
         shell.addView(contentFrame,new LinearLayout.LayoutParams(-1,0,1));
@@ -263,7 +263,8 @@ public class WorkshopActivity extends Activity {
         addBtn(batt,"Обновить параметры",true,this::showOverview);
 
         LinearLayout quick=card(page,"Быстрые действия","Выбери раздел сервисного обслуживания.");
-        addBtn(quick,"Установленные приложения и разрешения",true,()->showTab(1));
+        addBtn(quick,"Журнал активности: экран и фоновые службы",true,()->startActivity(new Intent(this,ActivityMonitorActivity.class)));
+        addBtn(quick,"Установленные приложения и разрешения",false,()->showTab(1));
         addBtn(quick,"Тесты экрана, вибрации, звука, датчиков",false,()->showTab(2));
         addBtn(quick,"Контакты, файлы, JSON-отчёт",false,()->showTab(3));
         addText(page,"Ограничения Android: некоторые защищённые параметры недоступны без привилегий системы. Система не сканируется на вирусы и не очищается скрытно.",11,MUTE,false,8);
@@ -314,6 +315,8 @@ public class WorkshopActivity extends Activity {
     private void showApps(){
         LinearLayout page=page("Приложения","Поиск, сортировка, разрешения и системное управление. Без скрытого удаления.");
         scanApps();
+        LinearLayout activityAccess=card(page,"История использования Android","События открытия приложений и foreground-служб. Доступ выдаётся в системных настройках.");
+        addBtn(activityAccess,"Показать журнал активности",true,()->startActivity(new Intent(this,ActivityMonitorActivity.class)));
         LinearLayout controls=card(page,"Приложения с иконкой запуска",appEntries.size()+" обнаружено. Полный список скрытых системных пакетов Android не предоставляет.");
         EditText search=new EditText(this);
         search.setSingleLine(true);search.setHint("Поиск по названию или package");
@@ -605,13 +608,15 @@ public class WorkshopActivity extends Activity {
     }
     private void showData(){
         LinearLayout page=page("Данные и инструменты","Расширенные операции открываются в проверенной версии 0.1.");
+        LinearLayout audit=card(page,"Активность приложений · AppUsage","История запусков на экране и зарегистрированных foreground-служб, поиск, фильтры, CSV.");
+        addBtn(audit,"Открыть журнал активности",true,()->startActivity(new Intent(this,ActivityMonitorActivity.class)));
         LinearLayout ext=card(page,"Контакты, файлы и отчёты","Резервное копирование VCF, системный выбор файлов, экспорт JSON и статистика использования.");
         addBtn(ext,"Открыть инструменты и экспорт",true,()->startActivity(new Intent(this,MainActivity.class)));
         LinearLayout android=card(page,"Переходы в настройки","Каждая операция выполняется в стандартном интерфейсе Android.");
         addBtn(android,"Настройки приложений",false,()->safelyLaunch(new Intent(Settings.ACTION_APPLICATION_SETTINGS)));
         addBtn(android,"Сведения об устройстве",false,()->safelyLaunch(new Intent(Settings.ACTION_DEVICE_INFO_SETTINGS)));
         addBtn(android,"Настройки Wi-Fi",false,()->safelyLaunch(new Intent(Settings.ACTION_WIFI_SETTINGS)));
-        LinearLayout about=card(page,"О приложении","Android Control Hub 0.2 Beta · локальная сервисная утилита.");
+        LinearLayout about=card(page,"О приложении","Android Control Hub 0.3 Beta · локальная сервисная утилита.");
         addText(about,"Доступ к файлам предоставляется только через системный выбор. Контакты экспортируются только по отдельному запросу. Ни пароли, ни SMS, ни содержимое других приложений не собираются.",12,MUTE,false,12);
         addBtn(about,"Открыть веб-сайт",false,()->safelyLaunch(new Intent(Intent.ACTION_VIEW,Uri.parse("https://kadukow1976-prog.github.io/android-control-hub/"))));
     }
