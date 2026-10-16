@@ -167,7 +167,7 @@ public class WorkshopActivity extends Activity {
         setContentView(shell);
         LinearLayout top=vertical();top.setBackgroundColor(Color.rgb(12,22,35));pad(top,18,11);
         addText(top,"ANDROID  CONTROL  HUB",11,GREEN,true,0);
-        addText(top,"Сервисная панель  ·  0.4 Beta",20,WHITE,true,0);
+        addText(top,"Сервисная панель  ·  0.5 Beta",20,WHITE,true,0);
         shell.addView(top,new LinearLayout.LayoutParams(-1,dp(83)));
         contentFrame=new FrameLayout(this);
         shell.addView(contentFrame,new LinearLayout.LayoutParams(-1,0,1));
@@ -623,7 +623,7 @@ public class WorkshopActivity extends Activity {
         addBtn(android,"Настройки приложений",false,()->safelyLaunch(new Intent(Settings.ACTION_APPLICATION_SETTINGS)));
         addBtn(android,"Сведения об устройстве",false,()->safelyLaunch(new Intent(Settings.ACTION_DEVICE_INFO_SETTINGS)));
         addBtn(android,"Настройки Wi-Fi",false,()->safelyLaunch(new Intent(Settings.ACTION_WIFI_SETTINGS)));
-        LinearLayout about=card(page,"О приложении","Android Control Hub 0.4 Beta · локальная сервисная утилита.");
+        LinearLayout about=card(page,"О приложении","Android Control Hub 0.5 Beta · локальная сервисная утилита.");
         addText(about,"Доступ к файлам предоставляется только через системный выбор. Контакты экспортируются только по отдельному запросу. Ни пароли, ни SMS, ни содержимое других приложений не собираются.",12,MUTE,false,12);
         addBtn(about,"Открыть веб-сайт",false,()->safelyLaunch(new Intent(Intent.ACTION_VIEW,Uri.parse("https://kadukow1976-prog.github.io/android-control-hub/"))));
     }

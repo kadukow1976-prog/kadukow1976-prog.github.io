@@ -1,5 +1,5 @@
 'use strict';
-const NAME = 'android-hub-v1.6.0';
+const NAME = 'android-hub-v1.7.0';
 const PREFIX = 'android-hub-v';
 const CORE = ['./', './index.html', './manifest.webmanifest', './icon.svg'];
 self.addEventListener('install', event => {
