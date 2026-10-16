@@ -1,0 +1,371 @@
+package ru.kadukov.androidcontrolhub;
+
+import android.Manifest;
+import android.app.Activity;
+import android.app.AlertDialog;
+import android.app.AppOpsManager;
+import android.app.usage.UsageEvents;
+import android.app.usage.UsageStatsManager;
+import android.content.Intent;
+import android.content.pm.ActivityInfo;
+import android.content.pm.ApplicationInfo;
+import android.content.pm.PackageInfo;
+import android.content.pm.PackageManager;
+import android.content.pm.ServiceInfo;
+import android.graphics.Color;
+import android.graphics.Typeface;
+import android.graphics.drawable.GradientDrawable;
+import android.net.Uri;
+import android.os.Bundle;
+import android.os.Process;
+import android.provider.Settings;
+import android.text.Editable;
+import android.text.TextWatcher;
+import android.view.Gravity;
+import android.view.View;
+import android.widget.ArrayAdapter;
+import android.widget.Button;
+import android.widget.CheckBox;
+import android.widget.EditText;
+import android.widget.LinearLayout;
+import android.widget.ScrollView;
+import android.widget.Spinner;
+import android.widget.TextView;
+import android.widget.Toast;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Set;
+
+public final class AppAuditActivity extends Activity {
+    private static final int BG=0xff09101d, CARD=0xff142234, BORDER=0xff30475b;
+    private static final int LIGHT=0xffeef7ff, MUTED=0xff9fb6c9, GREEN=0xff4ae6b1;
+    private static final String[] FILTERS={"Требуют проверки", "Наложение окон", "Автозапуск", "Игры", "Все пользовательские", "Выбранные", "Все включая системные"};
+    private final ArrayList<AppItem> inventory=new ArrayList<>();
+    private final Set<String> selected=new HashSet<>();
+    private LinearLayout root, rows;
+    private TextView scanInfo, listInfo;
+    private Spinner filter;
+    private String query="";
+    private int currentFilter=0;
+    private boolean loading=false, scanned=false;
+    private int generation=0;
+
+    private static class AppItem {
+        String pkg, title, version;
+        boolean system, overlayDeclared, bootReceiver, foregroundService, game;
+        int recentScreenEvents, recentServiceEvents;
+        long lastActivity;
+        int flags(){
+            return (overlayDeclared?1:0)+(bootReceiver?1:0)+(recentServiceEvents>0?1:0);
+        }
+    }
+    private int dp(float a){return Math.round(a*getResources().getDisplayMetrics().density);}
+    private GradientDrawable shape(int fill){
+        GradientDrawable d=new GradientDrawable();
+        d.setColor(fill);d.setCornerRadius(dp(13));d.setStroke(dp(1),BORDER);return d;
+    }
+    private TextView text(String v,int size,int color,boolean bold){
+        TextView t=new TextView(this);t.setText(v);t.setTextColor(color);t.setTextSize(size);
+        if(bold)t.setTypeface(null,Typeface.BOLD);
+        t.setLineSpacing(dp(2),1);return t;
+    }
+    private LinearLayout column(){LinearLayout l=new LinearLayout(this);l.setOrientation(LinearLayout.VERTICAL);return l;}
+    private LinearLayout.LayoutParams space(int n){
+        LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(-1,-2);p.bottomMargin=dp(n);return p;
+    }
+    private void add(LinearLayout v,String s,int size,int color,boolean bold,int bottom){v.addView(text(s,size,color,bold),space(bottom));}
+    private Button button(String s,Runnable action,boolean primary){
+        Button b=new Button(this);b.setAllCaps(false);b.setText(s);b.setTextSize(12);
+        b.setTextColor(primary?0xff092e25:LIGHT);
+        GradientDrawable d=shape(primary?GREEN:0xff1d3549);b.setBackground(d);
+        b.setOnClickListener(v->action.run());return b;
+    }
+    private void action(LinearLayout l,String s,Runnable run,boolean primary){
+        LinearLayout.LayoutParams p=space(9);p.height=dp(47);
+        l.addView(button(s,run,primary),p);
+    }
+    private LinearLayout card(String heading,String sub){
+        LinearLayout c=column();c.setPadding(dp(15),dp(14),dp(15),dp(14));
+        c.setBackground(shape(CARD));root.addView(c,space(13));
+        add(c,heading,16,LIGHT,true,5);
+        if(sub!=null)add(c,sub,12,MUTED,false,10);
+        return c;
+    }
+    @Override public void onCreate(Bundle state){
+        super.onCreate(state);
+        getWindow().setStatusBarColor(BG);
+        getWindow().setNavigationBarColor(BG);
+        ScrollView scroll=new ScrollView(this);scroll.setFillViewport(true);scroll.setBackgroundColor(BG);
+        root=column();root.setPadding(dp(14),dp(19),dp(14),dp(30));
+        scroll.addView(root);setContentView(scroll);
+        add(root,"Контроль приложений",24,GREEN,true,7);
+        add(root,"Сканирование запускается при открытии экрана. Никакие приложения не удаляются, не отключаются и не очищаются автоматически.",12,MUTED,false,15);
+        LinearLayout intro=card("01  Автосканирование",
+            "Проверка установленных пакетов, разрешения наложения окон, объявления автозапуска, категории игр и доступных событий использования.");
+        scanInfo=text("Подготовка…",12,MUTED,false);intro.addView(scanInfo,space(10));
+        action(intro,"Повторить сканирование",this::scan,true);
+        action(intro,"Журнал активности Android (Usage Access)",()->startActivity(new Intent(this,ActivityMonitorActivity.class)),false);
+        LinearLayout controls=card("02  Отдельные группы","Признаки, а не диагноз вируса. Игры и программы с наложением окон могут быть безопасными.");
+        filter=new Spinner(this);
+        ArrayAdapter<String> choices=new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,FILTERS);
+        filter.setAdapter(choices);controls.addView(filter,space(10));
+        EditText search=new EditText(this);search.setTextSize(13);
+        search.setTextColor(LIGHT);search.setHintTextColor(MUTED);search.setSingleLine(true);
+        search.setHint("Поиск названия или ID пакета");search.setPadding(dp(12),dp(9),dp(12),dp(9));
+        search.setBackground(shape(0xff0c1c2b));controls.addView(search,space(10));
+        listInfo=text("",12,GREEN,true);controls.addView(listInfo,space(9));
+        action(controls,"Системное управление выбранными",this::manageSelected,true);
+        action(controls,"Резервная копия / удалить личные файлы",()->startActivity(new Intent(this,PersonalFilesActivity.class)),false);
+
+        LinearLayout listing=card("03  Приложения","Отметьте программы, которые хотите проверить или обслужить.");
+        rows=column();listing.addView(rows);
+        filter.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener(){
+            public void onNothingSelected(android.widget.AdapterView<?> parent){}
+            public void onItemSelected(android.widget.AdapterView<?> parent,View v,int position,long id){
+                currentFilter=position;renderRows();
+            }
+        });
+        search.addTextChangedListener(new TextWatcher(){
+            public void beforeTextChanged(CharSequence s,int start,int count,int after){}
+            public void onTextChanged(CharSequence s,int start,int before,int count){
+                query=s.toString().trim().toLowerCase(Locale.ROOT);renderRows();
+            }
+            public void afterTextChanged(Editable e){}
+        });
+        LinearLayout note=card("Что именно проверяется","Осторожно с системными и банковскими приложениями.");
+        add(note,"• Наложение: приложение запросило SYSTEM_ALERT_WINDOW; реально включённый статус чужого приложения не гарантированно доступен.",11,MUTED,false,5);
+        add(note,"• Автозапуск: объявлен получатель BOOT_COMPLETED. Это не свидетельство выполнения сейчас.",11,MUTED,false,5);
+        add(note,"• Фон: зарегистрирован запуск foreground-службы по Usage Events. Планировщик JobScheduler, системные команды, скрипты и таймеры других приложений Android полностью не раскрывает.",11,MUTED,false,5);
+        add(note,"• Сведения о рекламе — признаки для ручной проверки. Автоматически назвать приложение вредоносным по этим признакам нельзя.",11,MUTED,false,2);
+        scan();
+    }
+    @Override protected void onDestroy(){generation++;super.onDestroy();}
+    private boolean usageAllowed(){
+        try{
+            AppOpsManager a=(AppOpsManager)getSystemService(APP_OPS_SERVICE);
+            return a!=null && a.checkOpNoThrow(AppOpsManager.OPSTR_GET_USAGE_STATS,Process.myUid(),getPackageName())==AppOpsManager.MODE_ALLOWED;
+        }catch(Exception e){return false;}
+    }
+    private static boolean permissionDeclared(PackageInfo info,String permission){
+        if(info.requestedPermissions==null)return false;
+        for(String p:info.requestedPermissions)if(permission.equals(p))return true;
+        return false;
+    }
+    private void scan(){
+        if(loading)return;
+        loading=true;scanned=false;
+        final int token=++generation;
+        scanInfo.setText("Идёт проверка. Не закрывайте экран…");
+        rows.removeAllViews();
+        PackageManager pm=getPackageManager();
+        new Thread(()->{
+            ArrayList<AppItem> result=new ArrayList<>();
+            String failure=null;boolean history=usageAllowed();
+            try{
+                int flags=PackageManager.GET_PERMISSIONS | PackageManager.GET_RECEIVERS | PackageManager.GET_SERVICES;
+                List<PackageInfo> packages=pm.getInstalledPackages(flags);
+                HashMap<String,int[]> events=new HashMap<>();
+                HashMap<String,Long> mostRecent=new HashMap<>();
+                if(history){
+                    try{
+                        UsageStatsManager mgr=(UsageStatsManager)getSystemService(USAGE_STATS_SERVICE);
+                        UsageEvents historyEvents=mgr==null?null:mgr.queryEvents(System.currentTimeMillis()-86400000L,System.currentTimeMillis());
+                        if(historyEvents!=null){
+                            UsageEvents.Event e=new UsageEvents.Event();
+                            while(historyEvents.hasNextEvent()){
+                                historyEvents.getNextEvent(e);
+                                String pkg=e.getPackageName();
+                                if(pkg==null)continue;
+                                int type=e.getEventType();
+                                if(type==1||type==19){
+                                    int[] counters=events.get(pkg);
+                                    if(counters==null){counters=new int[2];events.put(pkg,counters);}
+                                    if(type==1)counters[0]++;
+                                    if(type==19)counters[1]++;
+                                    mostRecent.put(pkg,e.getTimeStamp());
+                                }
+                            }
+                        }
+                    }catch(Exception ignored){}
+                }
+                for(PackageInfo info:packages){
+                    ApplicationInfo app=info.applicationInfo;
+                    if(app==null)continue;
+                    AppItem x=new AppItem();
+                    x.pkg=info.packageName;
+                    x.title=String.valueOf(pm.getApplicationLabel(app));
+                    x.system=(app.flags & ApplicationInfo.FLAG_SYSTEM)!=0;
+                    x.game=app.category==ApplicationInfo.CATEGORY_GAME||(app.flags&ApplicationInfo.FLAG_IS_GAME)!=0;
+                    x.version=info.versionName==null?"—":info.versionName;
+                    x.overlayDeclared=permissionDeclared(info,Manifest.permission.SYSTEM_ALERT_WINDOW);
+                    x.foregroundService=permissionDeclared(info,"android.permission.FOREGROUND_SERVICE");
+                    x.bootReceiver=false;
+                    // PackageInfo receivers do not expose each declared intent-filter action via this API.
+                    // No inference of BOOT_COMPLETED from the existence of a receiver alone.
+                    if(info.receivers!=null){
+                        for(ActivityInfo receiver:info.receivers){
+                            // Receiver class name alone is never proof of BOOT_COMPLETED.
+                            String cls=receiver.name==null?"":receiver.name.toLowerCase(Locale.ROOT);
+                            if(cls.contains("bootreceiver")||cls.contains("bootcompleted")){
+                                x.bootReceiver=true;break;  // heuristic label, NOT verified manifest action
+                            }
+                        }
+                    }
+                    int[] counters=events.get(x.pkg);
+                    if(counters!=null){x.recentScreenEvents=counters[0];x.recentServiceEvents=counters[1];}
+                    Long last=mostRecent.get(x.pkg);if(last!=null)x.lastActivity=last;
+                    result.add(x);
+                }
+                result.sort(Comparator.comparing(x->x.title.toLowerCase(Locale.ROOT)));
+            }catch(Exception ex){failure=ex.getClass().getSimpleName()+": "+ex.getMessage();}
+            String error=failure;
+            runOnUiThread(()->{
+                if(isFinishing()||isDestroyed()||token!=generation)return;
+                inventory.clear();inventory.addAll(result);
+                loading=false;scanned=error==null;
+                int overlays=0,boot=0,games=0,recent=0;
+                for(AppItem a:inventory){if(a.overlayDeclared)overlays++;if(a.bootReceiver)boot++;if(a.game)games++;if(a.recentServiceEvents>0)recent++;}
+                scanInfo.setText(error!=null?"Не удалось завершить скан: "+error:
+                    "Найдено пакетов: "+inventory.size()+"\nС запросом наложения: "+overlays+
+                    "\nВозможный автозапуск (по имени ресивера): "+boot+
+                    "\nИгры: "+games+"\nС событиями foreground-служб за 24 ч: "+recent+
+                    "\nИстория активности: "+(history?"разрешена":"нет Usage Access"));
+                renderRows();
+            });
+        },"ach-package-audit").start();
+    }
+    private boolean matches(AppItem x){
+        if(!query.isEmpty()&&!x.pkg.toLowerCase(Locale.ROOT).contains(query)
+          &&!x.title.toLowerCase(Locale.ROOT).contains(query))return false;
+        switch(currentFilter){
+            case 0:return !x.system&&(x.overlayDeclared||x.bootReceiver||x.recentServiceEvents>0);
+            case 1:return x.overlayDeclared;
+            case 2:return x.bootReceiver;
+            case 3:return x.game;
+            case 4:return !x.system;
+            case 5:return selected.contains(x.pkg);
+            default:return true;
+        }
+    }
+    private void renderRows(){
+        if(rows==null||listInfo==null)return;
+        rows.removeAllViews();
+        int count=0,rendered=0;
+        for(AppItem app:inventory){
+            if(!matches(app))continue;
+            count++;
+            if(rendered++>=120)continue;
+            LinearLayout item=column();item.setPadding(dp(12),dp(9),dp(12),dp(10));
+            item.setBackground(shape(0xff0d1e2c));rows.addView(item,space(8));
+            CheckBox pick=new CheckBox(this);
+            pick.setText(app.title);pick.setTextSize(14);pick.setTextColor(LIGHT);
+            pick.setButtonTintList(android.content.res.ColorStateList.valueOf(GREEN));
+            pick.setChecked(selected.contains(app.pkg));
+            pick.setOnCheckedChangeListener((b,checked)->{
+                if(checked)selected.add(app.pkg);else selected.remove(app.pkg);
+                updateCount();
+                if(currentFilter==5)renderRows();
+            });
+            item.addView(pick);
+            add(item,app.pkg,10,MUTED,false,3);
+            StringBuilder labels=new StringBuilder();
+            if(app.overlayDeclared)labels.append("Наложения заявлены · ");
+            if(app.bootReceiver)labels.append("Возможный автозапуск · ");
+            if(app.game)labels.append("Игра · ");
+            if(app.recentServiceEvents>0)labels.append("Foreground: "+app.recentServiceEvents+" · ");
+            if(app.recentScreenEvents>0)labels.append("На экране: "+app.recentScreenEvents+" · ");
+            if(labels.length()==0)labels.append("Подозрительных признаков не выявлено");
+            add(item,labels.toString(),11,(app.overlayDeclared||app.bootReceiver)?0xffffcc83:MUTED,false,5);
+            action(item,"Действия: "+app.title,()->manageOne(app),false);
+        }
+        if(count==0)add(rows,"Нет приложений по выбранным условиям.",13,MUTED,false,10);
+        if(count>120)add(rows,"Показано 120 из "+count+". Используйте поиск для остальных.",12,MUTED,false,10);
+        updateCount();
+    }
+    private void updateCount(){
+        listInfo.setText("Отмечено: "+selected.size()+"   ·   Всего в скане: "+inventory.size());
+    }
+    private void manageSelected(){
+        ArrayList<AppItem> matches=new ArrayList<>();
+        for(AppItem app:inventory)if(selected.contains(app.pkg))matches.add(app);
+        if(matches.isEmpty()){
+            Toast.makeText(this,"Сначала отметьте приложения галочками.",Toast.LENGTH_LONG).show();return;
+        }
+        String[] titles=new String[matches.size()];
+        for(int i=0;i<matches.size();i++)titles[i]=matches.get(i).title+" ("+matches.get(i).pkg+")";
+        new AlertDialog.Builder(this)
+            .setTitle("Выбрано "+matches.size()+" приложений")
+            .setMessage("Для безопасности действия открываются ПО ОДНОМУ приложению. Системные окна Android требуют вашего подтверждения. Массовой скрытой очистки или удаления нет.")
+            .setPositiveButton("Выбрать приложение",(d,w)->new AlertDialog.Builder(this).setTitle("Управление выбранными")
+               .setItems(titles,(dialog,which)->manageOne(matches.get(which)))
+               .setNegativeButton("Закрыть",null).show())
+            .setNegativeButton("Отмена",null).show();
+    }
+    private void manageOne(AppItem app){
+        final String[] choices={
+            "Открыть системные сведения / очистку кэша",
+            "Очистка всех данных через Android",
+            "Отключить / приостановить через Android",
+            "Разрешение показывать поверх окон",
+            "Обновить в Google Play",
+            "Удалить через системное окно",
+            "Сохранить / удалить выбранные личные файлы",
+            "История активности"
+        };
+        new AlertDialog.Builder(this)
+            .setTitle(app.title+"\n"+app.pkg)
+            .setMessage("Версия "+app.version+(app.system?" · системный пакет":"")+
+                "\nНаложения: "+(app.overlayDeclared?"заявлено разрешение":"не заявлено")+
+                "\nЗапуск после загрузки: "+(app.bootReceiver?"возможен (эвристика)":"не установлен")+
+                "\nОтложенные задачи, команды и скрипты других приложений: недоступны обычному Android API.")
+            .setItems(choices,(d,which)->{
+                switch(which){
+                    case 0:openDetails(app);break;
+                    case 1:confirmSettings(app,"Полная очистка данных",
+                            "Android может удалить аккаунты, настройки, внутренние файлы и данные приложения. Сначала сохраните доступные личные файлы.",()->openDetails(app));break;
+                    case 2:confirmSettings(app,"Отключение приложения",
+                            "Android может не позволить отключить системные службы. Для неизвестного приложения сначала проверьте его назначение.",()->openDetails(app));break;
+                    case 3:openOverlay(app);break;
+                    case 4:openStore(app);break;
+                    case 5:confirmSettings(app,"Удалить приложение",
+                            "Сохранить выбранные документы можно в разделе резервного копирования. Удаление приложения может стереть его приватные данные.",
+                            ()->{
+                                Intent intent=new Intent(Intent.ACTION_DELETE,Uri.parse("package:"+app.pkg));
+                                launch(intent);
+                            });break;
+                    case 6:startActivity(new Intent(this,PersonalFilesActivity.class));break;
+                    case 7:startActivity(new Intent(this,ActivityMonitorActivity.class));break;
+                }
+            }).setNegativeButton("Закрыть",null).show();
+    }
+    private void confirmSettings(AppItem app,String title,String message,Runnable op){
+        new AlertDialog.Builder(this)
+            .setTitle(title+": "+app.title)
+            .setMessage(message+"\n\nФайлы в защищённом хранилище этого приложения обычным APK скопировать невозможно.")
+            .setNeutralButton("Сохранить мои файлы",(d,w)->startActivity(new Intent(this,PersonalFilesActivity.class)))
+            .setNegativeButton("Отмена",null)
+            .setPositiveButton("Продолжить в Android",(d,w)->op.run()).show();
+    }
+    private void launch(Intent intent){
+        try{startActivity(intent);}
+        catch(Exception e){Toast.makeText(this,"Android не поддерживает это действие.",Toast.LENGTH_LONG).show();}
+    }
+    private void openDetails(AppItem a){
+        launch(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,Uri.parse("package:"+a.pkg)));
+    }
+    private void openOverlay(AppItem a){
+        Intent i=new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,Uri.parse("package:"+a.pkg));
+        launch(i);
+    }
+    private void openStore(AppItem a){
+        Intent i=new Intent(Intent.ACTION_VIEW,Uri.parse("market://details?id="+Uri.encode(a.pkg)));
+        try{startActivity(i);}
+        catch(Exception e){
+            launch(new Intent(Intent.ACTION_VIEW,Uri.parse("https://play.google.com/store/apps/details?id="+Uri.encode(a.pkg))));
+        }
+    }
+}
