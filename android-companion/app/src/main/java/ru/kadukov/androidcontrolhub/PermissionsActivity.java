@@ -63,6 +63,7 @@ public final class PermissionsActivity extends Activity {
     private static final int REQUEST_BLUETOOTH=405;
     private static final int REQUEST_NOTIFICATION=406;
     private static final int REQUEST_CONTACTS=407;
+    private static final int REQUEST_ALL=408;
     private static final String NOTIF_CHANNEL="ach.local.test";
     private final Handler handler=new Handler(Looper.getMainLooper());
     private final AtomicInteger micToken=new AtomicInteger();
@@ -153,7 +154,7 @@ public final class PermissionsActivity extends Activity {
     private void render(){
         root.removeAllViews();
         root.addView(txt("Центр разрешений",25,GREEN,true),bottom(7));
-        root.addView(txt("Android Control Hub · 0.4 Beta\nПрава предоставляются только по вашему выбору. Отказ не мешает остальным функциям.",12,MUTED,false),bottom(16));
+        root.addView(txt("Android Control Hub · 0.5 Beta\nПрава предоставляются только после вашего подтверждения в Android. Можно запросить их по отдельности или одной серией.",12,MUTED,false),bottom(16));
         LinearLayout summary=section("Сводка по разрешениям","Разрешения Android делятся на обычные, запрашиваемые при использовании и специальные доступы. Root и системные привилегии не выдаются обычным APK.");
         int available=1;int granted=has(Manifest.permission.READ_CONTACTS)?1:0;
         String[] dangerous={
@@ -164,6 +165,8 @@ public final class PermissionsActivity extends Activity {
         if(Build.VERSION.SDK_INT>=31){available++;if(has(Manifest.permission.BLUETOOTH_CONNECT))granted++;}
         if(Build.VERSION.SDK_INT>=33){available++;if(has(Manifest.permission.POST_NOTIFICATIONS))granted++;}
         summary.addView(txt("Обычных пользовательских разрешений: "+granted+" из "+available+"\nUsage Access: "+(usage()?"разрешён":"не выдан"),13,WHITE,true),bottom(12));
+        action(summary,"Запросить все применимые разрешения для диагностики",true,this::requestAllDiagnosticPermissions);
+        summary.addView(txt("Android может показать несколько системных запросов. Можно отказать в любом из них. Кнопка НЕ выдаёт Usage Access, root, ADB или системные права. Доступ к микрофону, камере и местоположению предоставляется только с вашего согласия.",11,MUTED,false),bottom(12));
         action(summary,"Перейти к настройкам приложения",false,this::appInfo);
         LinearLayout usageBlock=section("01 · История запуска приложений","История переходов на экран и зарегистрированных foreground-служб. Требует отдельного Usage Access. На установленном из APK приложении Android 16 может показывать «Доступ запрещён» из-за Restricted Settings.");
         addStatus(usageBlock,"Доступ к статистике",usage());
@@ -218,6 +221,35 @@ public final class PermissionsActivity extends Activity {
         action(system,"Открыть сведения о приложении",false,this::appInfo);
         system.addView(txt("Для расширенной лабораторной диагностики нужен отдельно настроенный ПК с ADB и явным подтверждением отладки на конкретном телефоне. Установка этого APK не предоставляет ADB/root.",11,MUTED,false),bottom(6));
     }
+    private String[] diagnosticPermissions(){
+        ArrayList<String> all=new ArrayList<>();
+        all.add(Manifest.permission.READ_CONTACTS);
+        all.add(Manifest.permission.READ_PHONE_STATE);
+        all.add(Manifest.permission.RECORD_AUDIO);
+        all.add(Manifest.permission.CAMERA);
+        all.add(Manifest.permission.ACCESS_COARSE_LOCATION);
+        all.add(Manifest.permission.ACCESS_FINE_LOCATION);
+        if(Build.VERSION.SDK_INT>=31)all.add(Manifest.permission.BLUETOOTH_CONNECT);
+        if(Build.VERSION.SDK_INT>=33)all.add(Manifest.permission.POST_NOTIFICATIONS);
+        ArrayList<String> missing=new ArrayList<>();
+        for(String permission:all)if(!has(permission))missing.add(permission);
+        return missing.toArray(new String[0]);
+    }
+    private void requestAllDiagnosticPermissions(){
+        String[] missing=diagnosticPermissions();
+        if(missing.length==0){
+            result("Разрешения диагностики","Все применимые обычные разрешения уже выданы.\n\nСпециальный Usage Access при необходимости включается отдельно в настройках Android.");
+            return;
+        }
+        new AlertDialog.Builder(this)
+            .setTitle("Запросить разрешения диагностики")
+            .setMessage("Будет запрошено недостающих разрешений: "+missing.length+
+                "\n\n• Контакты — экспорт VCF\n• Состояние телефона — SIM и сеть\n• Камера — проверка модуля\n• Микрофон — краткий тест звука\n• Местоположение — только точность последней фиксации\n• Bluetooth — сопряжённые устройства\n• Уведомления — тестовое сообщение"+
+                "\n\nAndroid покажет системные запросы. Вы вправе отказать в каждом. Никакой фоновый сбор данных не запускается. Usage Access выдаётся отдельно.")
+            .setNegativeButton("Отмена",null)
+            .setPositiveButton("Перейти к запросам",(d,w)->requestPermissions(missing,REQUEST_ALL))
+            .show();
+    }
     private void ensure(int requestCode,String[] permissions,Runnable operation){
         boolean hasAll=true;
         for(String permission:permissions)if(!has(permission)){hasAll=false;break;}
@@ -243,6 +275,13 @@ public final class PermissionsActivity extends Activity {
     @Override public void onRequestPermissionsResult(int requestCode,String[] permissions,int[] results){
         super.onRequestPermissionsResult(requestCode,permissions,results);
         render();
+        if(requestCode==REQUEST_ALL){
+            int grantedCount=0;
+            for(String permission:permissions)if(has(permission))grantedCount++;
+            result("Разрешения проверены","Разрешено новых: "+grantedCount+" из "+permissions.length+
+                "\n\nОставшиеся разрешения можно запросить повторно или включить в сведениях о приложении.\n\nUsage Access — отдельный специальный доступ Android.");
+            return;
+        }
         if(results.length==0)return;
         boolean allowed=false;
         if(requestCode==REQUEST_LOCATION){
