@@ -18,14 +18,16 @@ public final class ProUserService extends Binder {
 
     private static String invoke(String... args)throws Exception {
         Process process=Runtime.getRuntime().exec(args);
-        if(!process.waitFor(20,TimeUnit.SECONDS)){
-            process.destroyForcibly();
-            throw new IllegalStateException("Превышено время выполнения");
-        }
         StringBuilder output=new StringBuilder();
         try(BufferedReader reader=new BufferedReader(new InputStreamReader(process.getInputStream()))){
             String line;
-            while((line=reader.readLine())!=null && output.length()<1000)output.append(line).append('\n');
+            while((line=reader.readLine())!=null){
+                if(output.length()<65536)output.append(line,0,Math.min(line.length(),65536-output.length())).append('\n');
+            }
+        }
+        if(!process.waitFor(20,TimeUnit.SECONDS)){
+            process.destroyForcibly();
+            throw new IllegalStateException("Превышено время выполнения");
         }
         if(process.exitValue()!=0)throw new IllegalStateException("Команда не выполнена (код "+process.exitValue()+")");
         return output.toString();
@@ -46,6 +48,9 @@ public final class ProUserService extends Binder {
             if(!user.matches("[0-9]{1,4}"))return "ОТКАЗ: профиль пользователя не определён.";
             String location=invoke("/system/bin/pm","path","--user",user,pkg);
             if(!location.contains("package:"))return "ОТКАЗ: пакет не обнаружен.";
+            String systems=invoke("/system/bin/pm","list","packages","-s","--user",user);
+            if(systems.contains("package:"+pkg+"\\n")||systems.trim().endsWith("package:"+pkg))
+                return "ОТКАЗ: приложение имеет системный статус.";
             if(location.contains("package:/system/")||location.contains("package:/product/")
                 ||location.contains("package:/vendor/")||location.contains("package:/system_ext/"))
                 return "ОТКАЗ: системный пакет.";
