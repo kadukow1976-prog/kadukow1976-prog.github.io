@@ -13,7 +13,8 @@ import webbrowser
 from dataclasses import dataclass
 from agent_updates import (load_manifest, get_installed_agent, action_for,
                            download_verified_agent, install_agent_if_needed,
-                           check_sha, known_old_apk_name)
+                           check_sha, known_old_apk_name, restore_existing_agent,
+                           enable_existing_agent, launch_agent)
 
 AGENT_PACKAGE="ru.kadukov.androidcontrolhub"
 SHIZUKU_PACKAGE="moe.shizuku.privileged.api"
@@ -52,8 +53,14 @@ def probe_access(service):
             agent_status=("Установлен · versionCode "+str(agent_info.code)
                           if agent_info.code is not None
                           else "Установлен · версия не определена")
+            if agent_info.enabled is False:
+                agent_status+=" · ОТКЛЮЧЁН"
+            agent_status+=" · профиль "+str(agent_info.user_id)
+        elif agent_info.on_device:
+            agent_status=("Удалён для профиля "+str(agent_info.user_id)+
+                          " · возможно восстановление без скачивания")
         else:
-            agent_status="Не найден"
+            agent_status="Не установлен для профиля "+str(agent_info.user_id)
         agent_diag=agent_info.diagnostics
     except Exception as exc:
         agent_status="Не удалось проверить"
@@ -125,12 +132,66 @@ def attach_access_center(app):
         app.busy_call("Проверка доступов Android",lambda:probe_access(app.service),
                       lambda results:(display(results),app.log("Проверены уровни доступа и наличие сервисного агента")))
 
+    def perform_special(state,operation):
+        if state.user_id is None:
+            messagebox.showwarning("Не определён профиль Android",
+                "Нельзя выполнять восстановление без идентификатора пользователя.",parent=app)
+            return
+        if operation=="restore":
+            text=("Восстановить зарегистрированный APK Android Control Hub "
+                  "для профиля "+str(state.user_id)+"?\n\n"
+                  "Команда Android: cmd package install-existing --user "
+                  +str(state.user_id)+" "+AGENT_PACKAGE+
+                  "\n\nДанные приложения не очищаются. Root не требуется.")
+            label="Восстановление агента"
+            call=lambda:restore_existing_agent(app.service,state.serial,state.user_id)
+        else:
+            text=("Включить Android Control Hub для профиля "+str(state.user_id)+
+                  "?\nДействие применяется только к этому пакету.")
+            label="Включение агента"
+            call=lambda:enable_existing_agent(app.service,state.serial,state.user_id)
+        if not messagebox.askyesno(label,text,parent=app,default=messagebox.NO):
+            return
+        def complete(result):
+            app.log(label+": "+str(result))
+            messagebox.showinfo(label,str(result),parent=app)
+            audit()
+        app.busy_call(label,call,complete)
+
+    def open_agent():
+        def done(result):
+            app.log("Запуск агента: "+str(result))
+            messagebox.showinfo("Запуск Android-агента",
+                str(result)+"\n\nПроверьте экран телефона.",parent=app)
+        app.busy_call("Открыть Android Control Hub на телефоне",
+                      lambda:launch_agent(app.service),done)
+
     def display_agent_state(state,manifest,origin):
         plan=action_for(state,manifest)
+        if plan=="restore":
+            if messagebox.askyesno("Агент удалён из текущего профиля",
+                "Android сохранил APK агента (versionCode "+
+                str(state.code if state.code is not None else "неизвестен")+
+                "), но он НЕ установлен для пользователя "+str(state.user_id)+
+                ".\n\nВосстановить его штатной командой Android "
+                "без загрузки и очистки данных?",
+                parent=app,default=messagebox.NO):
+                perform_special(state,"restore")
+            return
+        if plan=="disabled":
+            if messagebox.askyesno("Агент отключён",
+                "Android подтверждает, что агент установлен, но отключён "
+                "для пользователя "+str(state.user_id)+
+                ".\nВключить приложение?",
+                parent=app,default=messagebox.NO):
+                perform_special(state,"enable")
+            return
         if plan=="current":
             messagebox.showinfo("Агент уже актуален",
-                "На телефоне установлен Android Control Hub Agent версии "
-                +str(state.code)+".\n\nНовая установка не требуется.\n"
+                "Агент обнаружен для пользователя "+str(state.user_id)+
+                ", версия "+str(state.code)+".\n\n"
+                "Если значка нет, нажмите «Открыть агент на телефоне» "
+                "либо проверьте скрытые приложения OxygenOS.\n"
                 "Релиз: "+manifest["version_name"]+"\nИсточник: "+origin,
                 parent=app)
             return
@@ -206,7 +267,7 @@ def attach_access_center(app):
         def report(result):
             manifest,origin,state=result
             plan=action_for(state,manifest)
-            if plan in ("current","newer","unknown"):
+            if plan in ("current","newer","unknown","restore","disabled"):
                 display_agent_state(state,manifest,origin)
                 return
             if not messagebox.askyesno("Установить проверенный APK",
@@ -237,6 +298,7 @@ def attach_access_center(app):
     for label,callback in (
         ("Проверить уровни",audit),
         ("Скачать / обновить агент",update_agent),
+        ("Открыть агент на телефоне",open_agent),
         ("Установить проверенный APK",install_agent),
         ("Настройки агента",open_agent_settings),
         ("Shizuku — инструкция",lambda:doc("https://shizuku.rikka.app/guide/setup/")),
