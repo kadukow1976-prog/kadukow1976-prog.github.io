@@ -45,7 +45,7 @@ class AccessCenterTests(unittest.TestCase):
         self.assertIn("не найдено",titles["Shizuku"])
         self.assertEqual(len(report),9)
         for cmd in mock.commands:
-            self.assertIn(cmd[0],{"id","pm","getprop","getenforce"})
+            self.assertIn(cmd[0],{"id","pm","dumpsys","cmd","getprop","getenforce"})
             self.assertNotIn("grant",cmd)
             self.assertNotIn("clear",cmd)
             self.assertNotIn("set-device-owner",cmd)
