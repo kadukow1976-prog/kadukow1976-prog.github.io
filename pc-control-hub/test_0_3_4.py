@@ -41,7 +41,7 @@ class AccessCenterTests(unittest.TestCase):
         titles={row.name:row.state for row in report}
         self.assertIn("Установлен",titles["Сервисный агент"])
         self.assertIn("UID 2000",titles["ADB-подключение"])
-        self.assertIn("Не найден",titles["Shizuku"])
+        self.assertIn("не найдено",titles["Shizuku"])
         self.assertEqual(len(report),9)
         for cmd in mock.commands:
             self.assertIn(cmd[0],{"id","pm","getprop","getenforce"})
