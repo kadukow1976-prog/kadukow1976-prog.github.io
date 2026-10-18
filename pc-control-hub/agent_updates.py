@@ -40,6 +40,7 @@ class InstalledAgent:
     installed: bool
     code: int | None
     serial: str | None
+    diagnostics: str = ""
 
 def validate_manifest(data):
     if not isinstance(data,dict):raise ValueError("Неверная структура версии агента")
@@ -86,16 +87,78 @@ def parse_version_code(text):
     match=re.search(r"(?m)^\s*versionCode=(\d+)\b",text or "")
     return int(match.group(1)) if match else None
 
+def _matching_package_info(text):
+    """Parse ONLY our package from pm output; no cross-package version confusion."""
+    for line in str(text or "").splitlines():
+        match=re.fullmatch(
+            r"package:"+re.escape(PACKAGE)+r"(?:\s+versionCode:(\d+))?(?:\s+.*)?",
+            line.strip()
+        )
+        if match:
+            return True, int(match.group(1)) if match.group(1) else None
+    return False,None
+
 def get_installed_agent(service):
-    """Do not infer a fresh agent from a path alone; parse actual package version."""
+    """Prefer the existing installed version; gracefully probe alternative Android APIs.
+
+    On Android 16 some OEM builds return adb exit code 1 for 'dumpsys package'.
+    A failed read-only probe must NEVER be treated as permission to downgrade,
+    uninstall, or clear an existing application.
+    """
     serial=getattr(service,"serial",None)
     if not serial:
         raise RuntimeError("Выберите подключённый и авторизованный телефон.")
-    path=str(service.shell("pm","path",PACKAGE,timeout=15))
-    installed=bool(re.search(r"(?m)^package:",path))
-    if not installed:return InstalledAgent(False,None,str(serial))
-    detail=str(service.shell("dumpsys","package",PACKAGE,timeout=18))
-    return InstalledAgent(True,parse_version_code(detail),str(serial))
+    issues=[]
+    def try_shell(*args):
+        try:
+            return str(service.shell(*args,timeout=20)).strip()
+        except Exception as exc:
+            issues.append(" ".join(args)+": "+str(exc)[:160])
+            return None
+
+    path=try_shell("pm","path",PACKAGE)
+    if path is not None and not re.search(r"(?m)^package:",path):
+        # A successful package-manager lookup explicitly reports no APK paths.
+        return InstalledAgent(False,None,str(serial))
+
+    # Android's dumpsys sometimes requires capabilities removed on OEM builds.
+    # Retain as the first version query for backwards compatibility.
+    if path is not None:
+        detail=try_shell("dumpsys","package",PACKAGE)
+        if detail is not None and ("Package ["+PACKAGE+"]") in detail:
+            version=parse_version_code(detail)
+            if version is not None:
+                return InstalledAgent(True,version,str(serial))
+
+    for args in (
+        ("pm","list","packages","--show-versioncode",PACKAGE),
+        ("cmd","package","list","packages","--show-versioncode",PACKAGE),
+    ):
+        result=try_shell(*args)
+        if result is None:
+            continue
+        present,version=_matching_package_info(result)
+        if present:
+            if version is not None:
+                return InstalledAgent(True,version,str(serial))
+            # A listing without versionCode is not sufficient to authorize install.
+            continue
+        if path is None:
+            # A successful list-packages query proves it is not installed.
+            return InstalledAgent(False,None,str(serial))
+
+    if path is None:
+        detail="; ".join(issues[-4:]) or "нет ответа от Android"
+        raise RuntimeError(
+            "Не удалось проверить установленный агент через ADB. "
+            "Android отклонил команды проверки пакета. "
+            "Установка отменена, старый агент не затронут.\n"
+            "Диагностика: "+detail
+        )
+    # APK is installed but no reliable version was obtained. Fail closed.
+    return InstalledAgent(True,None,str(serial),
+        "; ".join(issues[-4:]) or
+        "Система не вернула versionCode в доступных командах.")
 
 def action_for(installed,manifest):
     code=manifest["version_code"]
