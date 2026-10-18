@@ -25,6 +25,14 @@ class MockDevice:
         self.installs=[]
     def shell(self,*args,timeout=None):
         self.commands.append(args)
+        if args==("am","get-current-user"):
+            return "0"
+        if args==("pm","list","packages","--user","0","--show-versioncode",PACKAGE):
+            return ("package:"+PACKAGE+" versionCode:"+str(self.version)) if self.installed else ""
+        if args==("pm","list","packages","-u","--user","0","--show-versioncode",PACKAGE):
+            return ("package:"+PACKAGE+" versionCode:"+str(self.version)) if self.installed else ""
+        if args==("pm","list","packages","-d","--user","0","--show-versioncode",PACKAGE):
+            return ""
         if args==("pm","path",PACKAGE):
             return "package:/data/app/base.apk" if self.installed else ""
         if args==("dumpsys","package",PACKAGE):
