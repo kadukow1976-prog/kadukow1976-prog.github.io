@@ -57,7 +57,9 @@ class DownloadTests(unittest.TestCase):
         folder=config_root()/"platform-tools"
         folder.mkdir()
         (folder/"adb.exe").write_bytes(b"MZ"+b"\0"*9000)
-        with patch("ach_core.shutil.which",return_value=None):
+        # GitHub Windows runners have a separate preinstalled Android SDK.
+        # Isolate global SDK paths to test an incomplete managed installation.
+        with patch.dict(os.environ,{"ANDROID_HOME":"","ANDROID_SDK_ROOT":""},clear=False), patch("ach_core.shutil.which",return_value=None):
             self.assertIsNone(self.svc.discover_platform_tools())
         self.fetch(make_zip())
         self.assertTrue((folder/"fastboot.exe").exists())
