@@ -19,6 +19,12 @@ jobs:
       - name: Unpack verified source
         shell: pwsh
         run: Expand-Archive -Path pc-control-hub/AndroidControlHub-Windows-Source.zip -DestinationPath pc-control-hub/build -Force
+      - name: Upgrade original source with automatic ADB/Fastboot recovery
+        shell: pwsh
+        run: |
+          python pc-control-hub/upgrade_0_2.py pc-control-hub/build
+          Copy-Item pc-control-hub/test_bootstrap_0_2.py pc-control-hub/build/tests/test_bootstrap.py -Force
+          Copy-Item pc-control-hub/README.md pc-control-hub/build/README.md -Force
       - name: Run backend unit tests
         working-directory: pc-control-hub/build
         shell: pwsh
@@ -32,21 +38,33 @@ jobs:
         run: python -m PyInstaller --clean --onefile --windowed --name AndroidControlHub --paths src src/app.py
       - name: Package EXE and documentation
         shell: pwsh
-        run: Compress-Archive -Path pc-control-hub/build/dist/AndroidControlHub.exe,pc-control-hub/build/README.md -DestinationPath AndroidControlHub-Windows-0.1.0.zip -Force
+        run: Compress-Archive -Path pc-control-hub/build/dist/AndroidControlHub.exe,pc-control-hub/build/README.md -DestinationPath AndroidControlHub-Windows-0.2.0.zip -Force
+      - name: Package reproducible 0.2 source
+        shell: pwsh
+        run: |
+          $folder = 'pc-control-hub/source-package'
+          New-Item -ItemType Directory -Path $folder -Force | Out-Null
+          Copy-Item pc-control-hub/build/src $folder -Recurse -Force
+          Copy-Item pc-control-hub/build/tests $folder -Recurse -Force
+          Copy-Item pc-control-hub/build/README.md $folder -Force
+          Copy-Item pc-control-hub/build/start.cmd $folder -Force
+          Compress-Archive -Path "$folder/*" -DestinationPath AndroidControlHub-Windows-0.2.0-Source.zip -Force
       - uses: actions/upload-artifact@v4
         with:
           name: AndroidControlHub-Windows-EXE
-          path: AndroidControlHub-Windows-0.1.0.zip
+          path: |
+            AndroidControlHub-Windows-0.2.0.zip
+            AndroidControlHub-Windows-0.2.0-Source.zip
           if-no-files-found: error
       - name: Publish Windows beta release
         env:
           GH_TOKEN: ${{ github.token }}
         shell: pwsh
         run: |
-          $tag = 'android-control-hub-windows-0.1.0'
+          $tag = 'android-control-hub-windows-0.2.0'
           gh release view $tag 2>$null
           if ($LASTEXITCODE -eq 0) {
             Write-Host 'Release exists; preserving original build.'
             exit 0
           }
-          gh release create $tag AndroidControlHub-Windows-0.1.0.zip --target $env:GITHUB_SHA --title 'Android Control Hub Windows 0.1.0 Beta' --prerelease --notes 'Real ADB-based Windows diagnostics and maintenance for owner-authorized phones. Includes app list, package actions, cache-only safety guard, APK install, file backup, Fastboot info and logs. Requires developer USB debugging authorized by the owner. Automated unit tests run in CI; physical-phone tests pending. Beta is unsigned and may trigger SmartScreen.'
+          gh release create $tag AndroidControlHub-Windows-0.2.0.zip AndroidControlHub-Windows-0.2.0-Source.zip --target $env:GITHUB_SHA --title 'Android Control Hub Windows 0.2.0 Beta' --prerelease --notes 'Version 0.2: Automatically finds ADB/Fastboot or retrieves the official Google Platform Tools ZIP on startup, checks required files and CRC/PE signatures, repairs missing DLLs, saves SHA-256 inventory and retries device discovery. Never bypasses USB debugging authorization. 17 unit tests run in CI; actual Windows USB/device tests pending. Unsigned beta may trigger SmartScreen.'
