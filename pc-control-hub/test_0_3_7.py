@@ -15,9 +15,11 @@ class OxygenOS16:
     def shell(self,*args,timeout=None):
         self.commands.append(args)
         if args==("id","-u"):return "2000\n"
+        if args==("am","get-current-user"):return "0"
+        if args==("pm","list","packages","-d","--user","0","--show-versioncode",AGENT_PACKAGE):return ""
         if args==("pm","path",AGENT_PACKAGE):
             raise RuntimeError("Ошибка adb (код 1)")
-        if args==("pm","list","packages","--show-versioncode",AGENT_PACKAGE):
+        if args==("pm","list","packages","--user","0","--show-versioncode",AGENT_PACKAGE):
             return "package:ru.kadukov.androidcontrolhub versionCode:9\n"
         if args==("pm","path",SHIZUKU_PACKAGE):return ""
         if args==("getprop","ro.build.type"):return "user"
@@ -35,15 +37,15 @@ class StatusTests(unittest.TestCase):
         self.assertIn("Установлен",agent.state)
         self.assertIn("versionCode 9",agent.state)
         self.assertNotIn("Не найден",agent.state)
-        self.assertTrue(all(cmd[0] in ("id","pm","getprop","getenforce")
+        self.assertTrue(all(cmd[0] in ("id","pm","am","cmd","getprop","getenforce")
                             for cmd in device.commands))
 
     def test_unavailable_is_not_false_absence(self):
         class Blocked(OxygenOS16):
             def shell(self,*args,timeout=None):
-                if args==("pm","list","packages","--show-versioncode",AGENT_PACKAGE):
+                if args==("pm","list","packages","--user","0","--show-versioncode",AGENT_PACKAGE):
                     raise RuntimeError("Ошибка adb (код 1)")
-                if args==("cmd","package","list","packages","--show-versioncode",AGENT_PACKAGE):
+                if args==("cmd","package","list","packages","--user","0","--show-versioncode",AGENT_PACKAGE):
                     raise RuntimeError("Ошибка adb (код 1)")
                 return super().shell(*args,timeout=timeout)
         report=probe_access(Blocked())
