@@ -11,6 +11,9 @@ import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 import webbrowser
 from dataclasses import dataclass
+from agent_updates import (load_manifest, get_installed_agent, action_for,
+                           download_verified_agent, install_agent_if_needed,
+                           check_sha, known_old_apk_name)
 
 AGENT_PACKAGE="ru.kadukov.androidcontrolhub"
 SHIZUKU_PACKAGE="moe.shizuku.privileged.api"
@@ -107,18 +110,105 @@ def attach_access_center(app):
         app.busy_call("Проверка доступов Android",lambda:probe_access(app.service),
                       lambda results:(display(results),app.log("Проверены уровни доступа и наличие сервисного агента")))
 
+    def display_agent_state(state,manifest,origin):
+        plan=action_for(state,manifest)
+        if plan=="current":
+            messagebox.showinfo("Агент уже актуален",
+                "На телефоне установлен Android Control Hub Agent версии "
+                +str(state.code)+".\n\nНовая установка не требуется.\n"
+                "Релиз: "+manifest["version_name"]+"\nИсточник: "+origin,
+                parent=app)
+            return
+        if plan=="newer":
+            messagebox.showinfo("Новая версия уже на телефоне",
+                "На телефоне versionCode "+str(state.code)+", а доступный агент — "
+                +str(manifest["version_code"])+".\nПонижение версии запрещено.",
+                parent=app)
+            return
+        if plan=="unknown":
+            messagebox.showwarning("Неизвестная версия установленного агента",
+                "Агент найден, но Android не сообщил versionCode.\n"
+                "Автоматическая установка отменена: нельзя исключить понижение.",
+                parent=app)
+            return
+        text=("На устройстве агент не обнаружен." if plan=="install"
+              else "На устройстве версия "+str(state.code)+".")
+        if not messagebox.askyesno("Установить актуальный агент",
+            text+"\n\nДоступна "+manifest["version_name"]+" (versionCode "
+            +str(manifest["version_code"])+").\n"
+            "Файл будет загружен с GitHub и проверен по SHA-256.\n"
+            "После проверки выполнить установку на выбранный телефон?\n\n"
+            "Root, Device Owner или права system это НЕ предоставляет.",
+            parent=app,default=messagebox.NO):
+            return
+        def task():
+            expected_serial=state.serial
+            if str(getattr(app.service,"serial",None))!=expected_serial:
+                raise RuntimeError("Выбранный телефон изменился; установка отменена.")
+            verified=download_verified_agent(manifest)
+            if str(getattr(app.service,"serial",None))!=expected_serial:
+                raise RuntimeError("Подключённый телефон изменился после загрузки.")
+            return install_agent_if_needed(app.service,manifest,verified)
+        def complete(result):
+            app.log("Агент: "+str(result))
+            messagebox.showinfo("Установка агента",str(result),parent=app)
+            audit()
+        app.busy_call("Загрузить, проверить и установить агент",
+                      task,complete)
+
+    def update_agent():
+        def inspect():
+            manifest,source=load_manifest()
+            state=get_installed_agent(app.service)
+            return manifest,source,state
+        app.busy_call("Проверить версию агента",
+                      inspect,
+                      lambda result:display_agent_state(result[2],result[0],result[1]))
+
     def install_agent():
         filename=filedialog.askopenfilename(
-            parent=app,title="Выберите доверенный APK Android Control Hub",
+            parent=app,title="Выберите официальный APK Android Control Hub",
             filetypes=[("Установочные файлы Android","*.apk")])
         if not filename:return
-        if not messagebox.askyesno("Установить APK сервисного агента",
-            "Установить выбранный APK на активный авторизованный телефон?\n\n"
-            "Это НЕ активирует root, Device Owner или системные права.\n"
-            "Проверяйте источник и цифровую подпись APK перед установкой.",
-            parent=app,default=messagebox.NO):return
-        app.busy_call("Установка выбранного APK",lambda:app.service.install_apk([filename]),
-                      lambda result:(app.log("Установка APK: "+str(result)),audit()))
+        if known_old_apk_name(filename):
+            messagebox.showerror("Старый агент — установка запрещена",
+                "Выбран android-hub-beta-0.2.apk (versionCode 2).\n"
+                "На телефоне уже была версия 9. Android не разрешает понижение.\n\n"
+                "Нажмите «Скачать / обновить агент» для установки проверенной версии. "
+                "Удалять текущую программу не нужно.",parent=app)
+            return
+        def inspect_file():
+            manifest,source=load_manifest()
+            if not check_sha(filename,manifest):
+                raise RuntimeError(
+                    "Выбранный APK не совпадает с проверенным официальным релизом "
+                    +manifest["version_name"]+".\n\n"
+                    "Используйте кнопку «Скачать / обновить агент». "
+                    "Для любых других APK используйте раздел «Установка / Fastboot».")
+            return manifest,source,get_installed_agent(app.service)
+        def report(result):
+            manifest,origin,state=result
+            plan=action_for(state,manifest)
+            if plan in ("current","newer","unknown"):
+                display_agent_state(state,manifest,origin)
+                return
+            if not messagebox.askyesno("Установить проверенный APK",
+                "Файл совпал с официальным релизом "+manifest["version_name"]+
+                ".\nТелефон: "+str(state.serial)+
+                "\nУстановленная версия: "+
+                (str(state.code) if state.installed else "агента нет")+
+                "\n\nУстановить выбранный APK без потери данных?",
+                parent=app,default=messagebox.NO):
+                return
+            def execute():
+                if str(getattr(app.service,"serial",None))!=state.serial:
+                    raise RuntimeError("Выбранный телефон изменился.")
+                return install_agent_if_needed(app.service,manifest,filename)
+            app.busy_call("Установить проверенный APK агента",execute,
+                lambda outcome:(app.log("Агент: "+str(outcome)),
+                                messagebox.showinfo("Установка",str(outcome),parent=app),
+                                audit()))
+        app.busy_call("Проверить выбранный файл агента",inspect_file,report)
 
     def open_agent_settings():
         app.busy_call("Открыть системные настройки агента",
@@ -129,7 +219,8 @@ def attach_access_center(app):
         webbrowser.open(url)
     for label,callback in (
         ("Проверить уровни",audit),
-        ("Установить APK агента",install_agent),
+        ("Скачать / обновить агент",update_agent),
+        ("Установить проверенный APK",install_agent),
         ("Настройки агента",open_agent_settings),
         ("Shizuku — инструкция",lambda:doc("https://shizuku.rikka.app/guide/setup/")),
         ("Device Owner — инструкция",lambda:doc("https://developer.android.com/work/dpc/dedicated-devices")),
