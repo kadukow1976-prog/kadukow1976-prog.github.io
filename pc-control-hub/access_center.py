@@ -126,9 +126,11 @@ def attach_access_center(app):
                 parent=app)
             return
         if plan=="unknown":
-            messagebox.showwarning("Неизвестная версия установленного агента",
-                "Агент найден, но Android не сообщил versionCode.\n"
-                "Автоматическая установка отменена: нельзя исключить понижение.",
+            messagebox.showwarning("Не удалось определить версию агента",
+                "Агент обнаружен, но Android не предоставил versionCode.\n"
+                "Установка не выполнена, чтобы не понизить версию.\n\n"
+                "Подробности проверок ADB:\n" + (state.diagnostics or
+                "Доступные способы проверки не вернули номер версии.")[:1100],
                 parent=app)
             return
         text=("На устройстве агент не обнаружен." if plan=="install"
