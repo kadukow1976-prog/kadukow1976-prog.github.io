@@ -9,6 +9,7 @@ from access_center import probe_access,parse_uid,exists_from_pm,AGENT_PACKAGE,SH
 
 class MockADB:
     def __init__(self,agent=True,shizuku=False):
+        self.serial="TEST-DEVICE"
         self.agent=agent
         self.shizuku=shizuku
         self.commands=[]
