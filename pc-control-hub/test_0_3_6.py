@@ -19,16 +19,18 @@ class FakeOxygenOS:
         self.calls=[]
     def shell(self,*args,timeout=None):
         self.calls.append(args)
+        if args==("am","get-current-user"):return "0"
+        if args==("pm","list","packages","-d","--user","0","--show-versioncode",PACKAGE):return ""
         if args==("pm","path",PACKAGE):
             if not self.path_ok:raise RuntimeError("Ошибка adb (код 1)")
             return "package:/data/app/~~xxx/ru.kadukov.androidcontrolhub/base.apk"
         if args==("dumpsys","package",PACKAGE):
             raise RuntimeError("Ошибка adb (код 1)")
-        if args==("pm","list","packages","--show-versioncode",PACKAGE):
+        if args==("pm","list","packages","--user","0","--show-versioncode",PACKAGE):
             if self.version_list:
                 return "package:ru.kadukov.androidcontrolhub versionCode:9"
             raise RuntimeError("Ошибка adb (код 1)")
-        if args==("cmd","package","list","packages","--show-versioncode",PACKAGE):
+        if args==("cmd","package","list","packages","--user","0","--show-versioncode",PACKAGE):
             if self.cmd_list:
                 return "package:ru.kadukov.androidcontrolhub versionCode:9"
             raise RuntimeError("Ошибка adb (код 1)")
@@ -41,7 +43,7 @@ class OxygenVersionFallbackTests(unittest.TestCase):
         self.assertTrue(state.installed)
         self.assertEqual(state.code,9)
         self.assertEqual(action_for(state,OFFICIAL_DEFAULT),"current")
-        self.assertIn(("pm","list","packages","--show-versioncode",PACKAGE),device.calls)
+        self.assertIn(("pm","list","packages","--user","0","--show-versioncode",PACKAGE),device.calls)
         self.assertFalse(any("install" in x or "uninstall" in x or "clear" in x for c in device.calls for x in c))
 
     def test_pm_path_denied_but_list_returns_installed(self):
@@ -66,8 +68,8 @@ class OxygenVersionFallbackTests(unittest.TestCase):
 
     def test_no_working_queries_blocks_install(self):
         device=FakeOxygenOS(path_ok=False,version_list=False)
-        with self.assertRaisesRegex(RuntimeError,"Установка отменена"):
-            get_installed_agent(device)
+        state=get_installed_agent(device)
+        self.assertEqual(action_for(state,OFFICIAL_DEFAULT),"unknown")
         self.assertFalse(any("install" in s or "uninstall" in s
                              for c in device.calls for s in c))
 
@@ -85,7 +87,9 @@ class OxygenVersionFallbackTests(unittest.TestCase):
         class Missing:
             serial="CPH2747-serial"
             def shell(self,*args,timeout=None):
-                if args==("pm","path",PACKAGE): return ""
+                if args==("am","get-current-user"): return "0"
+                if args==("pm","list","packages","--user","0","--show-versioncode",PACKAGE): return ""
+                if args==("pm","list","packages","-u","--user","0","--show-versioncode",PACKAGE): return ""
                 raise AssertionError("No more probes should be needed")
         state=get_installed_agent(Missing())
         self.assertFalse(state.installed)
