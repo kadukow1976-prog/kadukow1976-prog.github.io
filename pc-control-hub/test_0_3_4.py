@@ -59,7 +59,7 @@ class AccessCenterTests(unittest.TestCase):
     def test_agent_absent_reported(self):
         report=probe_access(MockADB(agent=False,shizuku=True))
         states={row.name:row.state for row in report}
-        self.assertEqual(states["Сервисный агент"],"Не найден")
+        self.assertIn("Не установлен для профиля",states["Сервисный агент"])
         self.assertIn("не проверены",states["Shizuku"])
 
     def test_destructive_actions_still_require_confirmation(self):

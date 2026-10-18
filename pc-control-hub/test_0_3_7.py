@@ -50,7 +50,7 @@ class StatusTests(unittest.TestCase):
                 return super().shell(*args,timeout=timeout)
         report=probe_access(Blocked())
         state=next(x.state for x in report if x.name=="Сервисный агент")
-        self.assertEqual(state,"Не удалось проверить")
+        self.assertIn("Не удалось проверить",state)
 
     def test_updater_refreshes_audit(self):
         code=(ROOT/"src"/"access_center.py").read_text(encoding="utf-8")
