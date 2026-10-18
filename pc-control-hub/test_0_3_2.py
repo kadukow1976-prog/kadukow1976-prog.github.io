@@ -14,6 +14,8 @@ class DeniedClear:
     def __call__(self,argv,timeout):
         command=argv[1:]
         self.calls.append(command)
+        if command==["devices","-l"]:
+            return SimpleNamespace(returncode=0,stdout="List of devices attached\nABC123 device model:OnePlus\n",stderr="")
         shell=command[3:] if command[:3]==["-s","ABC123","shell"] else []
         if shell==["pm","list","packages","-3"]:
             return SimpleNamespace(returncode=0,stdout="package:ru.ozon.app.android\n",stderr="")
