@@ -50,12 +50,15 @@ def probe_access(service):
     try:
         agent_info=get_installed_agent(service)
         if agent_info.installed:
-            agent_status=("Установлен · versionCode "+str(agent_info.code)
+            if agent_info.code is None and agent_info.diagnostics.startswith("Не удалось проверить установку"):
+                agent_status="Не удалось проверить для профиля "+str(agent_info.user_id)
+            else:
+                agent_status=("Установлен · versionCode "+str(agent_info.code)
                           if agent_info.code is not None
                           else "Установлен · версия не определена")
-            if agent_info.enabled is False:
-                agent_status+=" · ОТКЛЮЧЁН"
-            agent_status+=" · профиль "+str(agent_info.user_id)
+                if agent_info.enabled is False:
+                    agent_status+=" · ОТКЛЮЧЁН"
+                agent_status+=" · профиль "+str(agent_info.user_id)
         elif agent_info.on_device:
             agent_status=("Удалён для профиля "+str(agent_info.user_id)+
                           " · возможно восстановление без скачивания")
