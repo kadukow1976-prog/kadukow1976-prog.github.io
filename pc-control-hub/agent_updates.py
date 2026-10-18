@@ -41,6 +41,9 @@ class InstalledAgent:
     code: int | None
     serial: str | None
     diagnostics: str = ""
+    user_id: str | None = None
+    on_device: bool = False
+    enabled: bool | None = None
 
 def validate_manifest(data):
     if not isinstance(data,dict):raise ValueError("Неверная структура версии агента")
@@ -98,75 +101,159 @@ def _matching_package_info(text):
             return True, int(match.group(1)) if match.group(1) else None
     return False,None
 
-def get_installed_agent(service):
-    """Prefer the existing installed version; gracefully probe alternative Android APIs.
+def _current_android_user(service):
+    """Never assume user 0; work with the currently selected Android profile."""
+    failures=[]
+    for args in (("am","get-current-user"),("cmd","activity","get-current-user")):
+        try:
+            result=str(service.shell(*args,timeout=12)).strip()
+            if re.fullmatch(r"\d{1,4}",result):
+                return result
+            failures.append(" ".join(args)+": "+result[:100])
+        except Exception as exc:
+            failures.append(" ".join(args)+": "+str(exc)[:130])
+    raise RuntimeError(
+        "Не удалось определить активного пользователя Android. "
+        "Установка и восстановление агента остановлены.\n"+
+        "; ".join(failures)
+    )
 
-    On Android 16 some OEM builds return adb exit code 1 for 'dumpsys package'.
-    A failed read-only probe must NEVER be treated as permission to downgrade,
-    uninstall, or clear an existing application.
+def _query_package_list(service,user,package,allow_uninstalled=False,disabled=False):
+    """Read a package-list scoped to the actual Android user.
+
+    None => failed query, (False,None) => successful absence,
+    (True, versionCode|None) => package visible for current user.
+    """
+    variants=[
+        ("pm","list","packages"),
+        ("cmd","package","list","packages")
+    ]
+    issues=[]
+    for prefix in variants:
+        for show_version in (True,False):
+            args=prefix + (
+                ("-u",) if allow_uninstalled else ()
+            ) + (
+                ("-d",) if disabled else ()
+            ) + ("--user",user) + (
+                ("--show-versioncode",) if show_version else ()
+            ) + (package,)
+            try:
+                value=str(service.shell(*args,timeout=18))
+            except Exception as exc:
+                issues.append(" ".join(args)+": "+str(exc)[:120])
+                continue
+            present,version=_matching_package_info(value)
+            return (present,version), issues
+    return None,issues
+
+def get_installed_agent(service):
+    """Confirm agent availability for ACTIVE Android user, not cached APK metadata.
+
+    Package lists with -u and dumpsys may mention packages not installed
+    for this user. These sources cannot prove an agent is operational.
     """
     serial=getattr(service,"serial",None)
     if not serial:
         raise RuntimeError("Выберите подключённый и авторизованный телефон.")
-    issues=[]
-    def try_shell(*args):
+    user=_current_android_user(service)
+    active,failures=_query_package_list(service,user,PACKAGE)
+    if active is None:
+        return InstalledAgent(True,None,str(serial),
+            "Не удалось проверить установку для пользователя "+user+". "+
+            "; ".join(failures[-4:]),user_id=user)
+
+    present,code=active
+    if not present:
+        cached,cache_errors=_query_package_list(
+            service,user,PACKAGE,allow_uninstalled=True)
+        cached_found=bool(cached and cached[0])
+        cached_code=cached[1] if cached_found else None
+        diagnostics=("APK сохранён в Android, но НЕ установлен для профиля "+user+"."
+                     if cached_found else "Агент отсутствует в профиле "+user+".")
+        if cached is None:
+            diagnostics+=" Проверка архива APK недоступна: "+"; ".join(cache_errors[-2:])
+        return InstalledAgent(False,cached_code,str(serial),diagnostics,
+                              user_id=user,on_device=cached_found)
+
+    if code is None:
+        detail=None
         try:
-            return str(service.shell(*args,timeout=20)).strip()
+            detail=str(service.shell("dumpsys","package",PACKAGE,timeout=18))
         except Exception as exc:
-            issues.append(" ".join(args)+": "+str(exc)[:160])
-            return None
-
-    path=try_shell("pm","path",PACKAGE)
-    if path is not None and not re.search(r"(?m)^package:",path):
-        # A successful package-manager lookup explicitly reports no APK paths.
-        return InstalledAgent(False,None,str(serial))
-
-    # Android's dumpsys sometimes requires capabilities removed on OEM builds.
-    # Retain as the first version query for backwards compatibility.
-    if path is not None:
-        detail=try_shell("dumpsys","package",PACKAGE)
+            failures.append("dumpsys package: "+str(exc)[:100])
         if detail is not None and ("Package ["+PACKAGE+"]") in detail:
-            version=parse_version_code(detail)
-            if version is not None:
-                return InstalledAgent(True,version,str(serial))
-
-    for args in (
-        ("pm","list","packages","--show-versioncode",PACKAGE),
-        ("cmd","package","list","packages","--show-versioncode",PACKAGE),
-    ):
-        result=try_shell(*args)
-        if result is None:
-            continue
-        present,version=_matching_package_info(result)
-        if present:
-            if version is not None:
-                return InstalledAgent(True,version,str(serial))
-            # A listing without versionCode is not sufficient to authorize install.
-            continue
-        if path is None:
-            # A successful list-packages query proves it is not installed.
-            return InstalledAgent(False,None,str(serial))
-
-    if path is None:
-        detail="; ".join(issues[-4:]) or "нет ответа от Android"
-        raise RuntimeError(
-            "Не удалось проверить установленный агент через ADB. "
-            "Android отклонил команды проверки пакета. "
-            "Установка отменена, старый агент не затронут.\n"
-            "Диагностика: "+detail
-        )
-    # APK is installed but no reliable version was obtained. Fail closed.
-    return InstalledAgent(True,None,str(serial),
-        "; ".join(issues[-4:]) or
-        "Система не вернула versionCode в доступных командах.")
+            code=parse_version_code(detail)
+    code_errors="; ".join(failures[-3:]) if code is None else ""
+    disabled_result,disabled_errors=_query_package_list(
+        service,user,PACKAGE,disabled=True)
+    enabled=None if disabled_result is None else not disabled_result[0]
+    return InstalledAgent(True,code,str(serial),code_errors,
+                          user_id=user,on_device=True,enabled=enabled)
 
 def action_for(installed,manifest):
     code=manifest["version_code"]
-    if not installed.installed:return "install"
+    if not installed.installed:
+        return "restore" if installed.on_device else "install"
+    if installed.enabled is False:
+        return "disabled"
     if installed.code is None:return "unknown"
     if installed.code>code:return "newer"
     if installed.code==code:return "current"
     return "upgrade"
+
+def restore_existing_agent(service,expected_serial,expected_user):
+    """Explicitly requested recovery for already-present package, no data wipe."""
+    if str(getattr(service,"serial",None))!=str(expected_serial):
+        raise RuntimeError("Активный телефон изменился: операция отменена.")
+    state=get_installed_agent(service)
+    if state.user_id!=expected_user:
+        raise RuntimeError("Активный пользователь Android изменился.")
+    if state.installed:
+        return "Агент уже установлен в текущем профиле; восстановление не нужно."
+    if not state.on_device:
+        raise RuntimeError("В системе нет сохранённого APK. Используйте обычную установку.")
+    response=str(service.shell("cmd","package","install-existing",
+                               "--user",expected_user,PACKAGE,timeout=40))
+    after=get_installed_agent(service)
+    if not after.installed:
+        raise RuntimeError("Android не подтвердил восстановление агента: "+response[:400])
+    return ("Агент восстановлен для пользователя "+expected_user+
+            ".\n"+response[:250])
+
+def enable_existing_agent(service,expected_serial,expected_user):
+    """Enable only our own known package, only after user consent."""
+    if str(getattr(service,"serial",None))!=str(expected_serial):
+        raise RuntimeError("Активный телефон изменился.")
+    state=get_installed_agent(service)
+    if state.user_id!=expected_user or not state.installed:
+        raise RuntimeError("Агент не подтверждён для текущего профиля.")
+    if state.enabled is True:
+        return "Агент уже включён."
+    response=str(service.shell("pm","enable","--user",expected_user,
+                               PACKAGE,timeout=25))
+    after=get_installed_agent(service)
+    if after.enabled is False:
+        raise RuntimeError("Агент остался отключённым: "+response[:250])
+    return "Отправлена команда включения агента.\n"+response[:200]
+
+def launch_agent(service,expected_serial=None):
+    """Open the known exported WorkshopActivity, without silent privilege changes."""
+    serial=str(getattr(service,"serial",None) or "")
+    if not serial or (expected_serial is not None and serial!=str(expected_serial)):
+        raise RuntimeError("Не выбран нужный телефон.")
+    state=get_installed_agent(service)
+    if not state.installed:
+        raise RuntimeError("Агент не установлен в активном профиле.")
+    if state.enabled is False:
+        raise RuntimeError("Агент отключён. Сначала включите его вручную.")
+    output=str(service.shell(
+        "am","start","--user",str(state.user_id),"-n",
+        PACKAGE+"/.WorkshopActivity",timeout=25))
+    if re.search(r"(?i)\b(error|exception|does not exist|unable to resolve)\b",output):
+        raise RuntimeError("Не удалось открыть Android Control Hub на телефоне: "+output[:500])
+    return ("Отправлена команда открытия Android Control Hub на телефоне.\n"+
+            output[:250])
 
 def check_sha(path,manifest):
     f=Path(path)
@@ -229,6 +316,8 @@ def install_agent_if_needed(service,manifest,path):
     if status=="newer":return "На телефоне версия "+str(state.code)+" новее доступной "+str(manifest["version_code"])+". Понижение запрещено."
     if status=="unknown":
         raise RuntimeError("Версия установленного агента не определена; автоматическая установка запрещена.")
+    if status in ("restore","disabled"):
+        raise RuntimeError("Агент найден в системе, но не активен. Используйте восстановление или включение после подтверждения.")
     # No -d flag, no uninstall or user-data reset.
     result=service.install_apk([str(path)])
     return "Установка APK: "+str(result)
