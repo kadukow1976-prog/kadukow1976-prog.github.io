@@ -165,8 +165,10 @@ app = patch(app, '''        if not messagebox.askyesno("Расширенное �
 app = patch(app, '''        buttons = ttk.Frame(self.t_apps)
         buttons.pack(fill="x", pady=(12, 2))
         for title, callback in (("Сведения", self.details), ("Очистить кэш", lambda: self.bulk("cache")),
-                                ("Остановить", lambda: self.bulk("stop")), ("Отключить", lambda: self.bulk("disable")),
-                                ("Включить", lambda: self.bulk("enable")), ("Удалить", lambda: self.bulk("uninstall")),
+                                ("Остановить", lambda: self.bulk("stop")),
+                                ("Отключить", lambda: self.bulk("disable")),
+                                ("Включить", lambda: self.bulk("enable")),
+                                ("Удалить", lambda: self.bulk("uninstall")),
                                 ("Очистить данные", lambda: self.bulk("data"))):
             ttk.Button(buttons, text=title, command=callback).pack(side="left", padx=(0, 6))
 ''',
