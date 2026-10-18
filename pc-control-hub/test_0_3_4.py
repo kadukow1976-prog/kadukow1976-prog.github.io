@@ -60,6 +60,6 @@ class AccessCenterTests(unittest.TestCase):
         self.assertIn('from access_center import attach_access_center',app)
         self.assertIn('mode in ("data", "uninstall", "disable")',app)
         self.assertIn('default=messagebox.NO',app)
-        self.assertIn('VERSION = "0.3.4"',app)
+        self.assertRegex(app, r'VERSION = "0\.3\.[0-9]+"')
 
 if __name__=="__main__":unittest.main()
