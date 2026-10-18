@@ -25,7 +25,7 @@ replace('        self.app_table.heading("package", text="Пакет устано
         self.app_table.heading("package", text="Пакет установленного приложения")''',"column header")
 replace('        self.app_table.bind("<Double-1>", lambda _event: self.details())',
 '''        self.app_table.bind("<Button-1>", self.toggle_package_mark, add="+")
-        self.app_table.bind("<Double-1>", self.details)
+        self.app_table.bind("<Double-1>", lambda _event: self.details())
         markers = ttk.Frame(self.t_apps)
         markers.pack(fill="x", pady=(4, 4))
         ttk.Button(markers, text="✓ Отметить видимые", command=self.mark_visible_packages).pack(side="left", padx=(0, 5))
@@ -75,7 +75,7 @@ replace('    def selected_packages(self):',
         self.marked_packages.clear()
         for item in self.app_table.get_children():
             self.app_table.set(item,"checked","☐")
-        self.app_table.selection_remove(self.app_table.selection())
+        self.app_table.selection_remove(*self.app_table.selection())
         self.mark_counter.set("Отмечено: 0")
 
     def selected_packages(self):''',"mark and unmark methods")
