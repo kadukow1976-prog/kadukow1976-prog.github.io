@@ -16,6 +16,12 @@ class MockADB:
     def shell(self,*args,timeout=0):
         self.commands.append(tuple(args))
         lookup={
+            ("am","get-current-user"):"0",
+            ("pm","list","packages","--user","0","--show-versioncode",AGENT_PACKAGE):(
+                "package:"+AGENT_PACKAGE+" versionCode:9" if self.agent else ""),
+            ("pm","list","packages","-u","--user","0","--show-versioncode",AGENT_PACKAGE):(
+                "package:"+AGENT_PACKAGE+" versionCode:9" if self.agent else ""),
+            ("pm","list","packages","-d","--user","0","--show-versioncode",AGENT_PACKAGE):"",
             ("id","-u"):"2000\n",
             ("pm","path",AGENT_PACKAGE):"package:/data/app/agent/base.apk\n" if self.agent else "",
             ("pm","path",SHIZUKU_PACKAGE):"package:/data/app/shizuku/base.apk\n" if self.shizuku else "",
@@ -45,7 +51,7 @@ class AccessCenterTests(unittest.TestCase):
         self.assertIn("не найдено",titles["Shizuku"])
         self.assertEqual(len(report),9)
         for cmd in mock.commands:
-            self.assertIn(cmd[0],{"id","pm","dumpsys","cmd","getprop","getenforce"})
+            self.assertIn(cmd[0],{"id","pm","am","dumpsys","cmd","getprop","getenforce"})
             self.assertNotIn("grant",cmd)
             self.assertNotIn("clear",cmd)
             self.assertNotIn("set-device-owner",cmd)
