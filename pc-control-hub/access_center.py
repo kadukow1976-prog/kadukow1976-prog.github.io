@@ -43,7 +43,21 @@ def exists_from_pm(text):
 def probe_access(service):
     """Read-only inspection, no pm grant, appops set, dpm, su, reset or pm clear."""
     uid=parse_uid(_read(service,"id","-u"))
-    agent=exists_from_pm(_read(service,"pm","path",AGENT_PACKAGE))
+    # Use the same multi-command inspection as the updater. Some Android 16
+    # builds reject 'pm path' but allow 'pm list packages --show-versioncode'.
+    # Never confuse a failed query with an absent application.
+    try:
+        agent_info=get_installed_agent(service)
+        if agent_info.installed:
+            agent_status=("Установлен · versionCode "+str(agent_info.code)
+                          if agent_info.code is not None
+                          else "Установлен · версия не определена")
+        else:
+            agent_status="Не найден"
+        agent_diag=agent_info.diagnostics
+    except Exception as exc:
+        agent_status="Не удалось проверить"
+        agent_diag=str(exc)[:320]
     shizuku=exists_from_pm(_read(service,"pm","path",SHIZUKU_PACKAGE))
     build=_read(service,"getprop","ro.build.type").strip()
     enforce=_read(service,"getenforce").strip()
@@ -53,9 +67,10 @@ def probe_access(service):
             "Android Debug Bridge разрешён владельцем при подключении. "
             "Это не system и не root."),
         AccessResult("Сервисный агент",
-            "Установлен" if agent else "Не найден",
-            "APK можно установить через ADB только после выбора файла и подтверждения. "
-            "Установка не выдаёт системные привилегии."),
+            agent_status,
+            "Версия определяется теми же безопасными командами, что и при обновлении. "
+            "Установка APK не выдаёт системные привилегии."
+            + (" Детали ADB: "+agent_diag if agent_diag else "")),
         AccessResult("Shizuku",
             "APK найден; служба и разрешение не проверены" if shizuku else "Приложение не найдено",
             "Shizuku нужно запустить и разрешить доступ на телефоне. "
@@ -165,7 +180,7 @@ def attach_access_center(app):
             return manifest,source,state
         app.busy_call("Проверить версию агента",
                       inspect,
-                      lambda result:display_agent_state(result[2],result[0],result[1]))
+                      lambda result:(display_agent_state(result[2],result[0],result[1]),audit()))
 
     def install_agent():
         filename=filedialog.askopenfilename(
