@@ -10,6 +10,7 @@ import threading
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 import webbrowser
+from platform_tools_health import diagnose_platform_tools
 from dataclasses import dataclass
 from agent_updates import (load_manifest, get_installed_agent, action_for,
                            download_verified_agent, install_agent_if_needed,
@@ -308,5 +309,17 @@ def attach_access_center(app):
         ("Device Owner — инструкция",lambda:doc("https://developer.android.com/work/dpc/dedicated-devices")),
     ):
         ttk.Button(buttons,text=label,command=callback).pack(side="left",padx=(0,5))
+    def diagnose_modes():
+        def complete(report):
+            listbox.configure(state="normal")
+            listbox.delete("1.0","end")
+            listbox.insert("1.0",report)
+            listbox.configure(state="disabled")
+            app.log("Диагностика ADB/Fastboot: выполнены только команды чтения")
+        app.busy_call("Диагностика ADB/Fastboot",
+            lambda:diagnose_platform_tools(app.service),
+            complete,require_device=False)
+    ttk.Button(frame,text="Диагностика ADB/Fastboot (только чтение)",
+               command=diagnose_modes).pack(anchor="w",pady=(2,3))
     ttk.Label(frame,text="Проверка прав ≠ выдача прав. Действия с очисткой данных остаются в разделе «Приложения».",
               style="Muted.TLabel").pack(anchor="w",pady=(5,0))
